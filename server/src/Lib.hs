@@ -5,18 +5,20 @@
 module Lib
   ( runGame
   ) where
+
+import           Control.Distributed.Process
 import           Control.Distributed.Process.Serializable
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
+import           Data.Binary
 import qualified Data.ByteString.Lazy                     as LBS
 import           Data.Monoid
-import qualified Network.WebSockets                       as WS
-
-import           Control.Distributed.Process
-import           Data.Binary
+import qualified Data.Text.Lazy                           as LT
+import qualified Data.Text.Lazy.Encoding                  as LTE
 import           Data.Typeable
 import           GHC.Generics
+import qualified Network.WebSockets                       as WS
 
 data PlayerMessage =
   Hello Int
@@ -39,23 +41,24 @@ acceptClientConnection pendingConnection = do
   (_releaseKey, connection) <-
     allocate
       (runStdoutLoggingT $
-       do conn <- liftIO $ WS.acceptRequest pendingConnection
-          logInfoN $ "Joined"
-          return conn)
+       do logInfoN "New connection received."
+          liftIO $ WS.acceptRequest pendingConnection)
       (\_ -> runStdoutLoggingT $ logInfoN "Leaves")
-  forever $ liftIO $
-    do msg <- WS.receiveDataMessage connection
+  forever $
+    runStdoutLoggingT $
+    do msg <- liftIO $ WS.receiveDataMessage connection
        case msg of
-         (WS.Text text) -> WS.sendTextData connection ("You said: " <> text)
-         _ ->
-           WS.sendDataMessage connection $
-           WS.Text ("Sorry, I don't understand." :: LBS.ByteString)
+         (WS.Text text) -> do
+           logInfoN $ "Received: " <> LT.toStrict (LTE.decodeUtf8 text)
+           liftIO $ WS.sendTextData connection ("You said: " <> text)
+         _ -> do
+           logInfoN "Received binary data."
+           liftIO $
+             WS.sendDataMessage connection $
+             WS.Text ("Sorry, I don't understand." :: LBS.ByteString)
 
 runGame :: IO ()
 runGame =
   runStdoutLoggingT $
   do logInfoN "START"
-     server <-
-       liftIO $
-       WS.runServer "127.0.0.1" 8000 $ (runResourceT . acceptClientConnection)
-     logInfoN "END"
+     liftIO $ WS.runServer "127.0.0.1" 8000 $ runResourceT . acceptClientConnection
