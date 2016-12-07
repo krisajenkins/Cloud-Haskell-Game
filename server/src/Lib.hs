@@ -54,8 +54,9 @@ acceptClientConnection pendingConnection = do
          _ -> do
            logInfoN "Received binary data."
            liftIO $
-             WS.sendDataMessage connection $
-             WS.Text ("Sorry, I don't understand." :: LBS.ByteString)
+             WS.sendTextData
+               connection
+               ("Sorry, I don't understand." :: LBS.ByteString)
 
 runGame :: IO ()
 runGame =
