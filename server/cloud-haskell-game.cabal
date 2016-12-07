@@ -24,6 +24,7 @@ library
                      , distributed-process
                      , distributed-process-simplelocalnet
                      , distributed-process-supervisor
+                     , network-transport-inmemory
                      , containers
                      , lens
                      , megaparsec

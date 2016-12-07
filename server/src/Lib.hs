@@ -1,12 +1,15 @@
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Lib
   ( runGame
   ) where
 
 import           Control.Distributed.Process
+import           Control.Distributed.Process.Debug
+import           Control.Distributed.Process.Node
 import           Control.Distributed.Process.Serializable
 import           Control.Monad
 import           Control.Monad.Logger
@@ -14,10 +17,12 @@ import           Control.Monad.Trans.Resource
 import           Data.Binary
 import qualified Data.ByteString.Lazy                     as LBS
 import           Data.Monoid
+import qualified Data.Text                                as T
 import qualified Data.Text.Lazy                           as LT
 import qualified Data.Text.Lazy.Encoding                  as LTE
 import           Data.Typeable
 import           GHC.Generics
+import           Network.Transport.InMemory
 import qualified Network.WebSockets                       as WS
 
 data PlayerMessage =
@@ -26,14 +31,6 @@ data PlayerMessage =
 
 instance Serializable PlayerMessage
 
--- main :: IO ()
--- main = do
---   [host, port] <- getArgs
---   backend <- initializeBackend host port initRemoteTable
---   node <- newLocalNode backend
---   peers <- findPeers backend 1000000
---   runProcess node $
---     forM_ peers $ \peer -> nsendRemote peer "echo-server" "hello!"
 acceptClientConnection
   :: MonadResource m
   => WS.PendingConnection -> m ()
@@ -60,6 +57,25 @@ acceptClientConnection pendingConnection = do
 
 runGame :: IO ()
 runGame =
-  runStdoutLoggingT $
-  do logInfoN "START"
-     liftIO $ WS.runServer "127.0.0.1" 8000 $ runResourceT . acceptClientConnection
+  let host = "127.0.0.1"
+      websocketPort = 8000
+  in runStdoutLoggingT $
+     do logInfoN "START"
+        logInfoN "Booting Cloud Haskell"
+        backend <- liftIO $ createTransport
+        node <- liftIO $ newLocalNode backend initRemoteTable
+        logInfoN "Created Node"
+        processId :: ProcessId <- liftIO $ forkProcess node simpleProcess
+        logInfoN $ "Forked process: " <> T.pack (show processId)
+        logInfoN "----"
+        logInfoN "Starting Websockets"
+        liftIO $ WS.runServer host websocketPort $ runResourceT . acceptClientConnection
+        logInfoN "END"
+
+simpleProcess :: Process ()
+simpleProcess = do
+  self <- getSelfPid -- get our own process id
+  enableTrace self
+  send self ("hello" :: String)
+  hello <- expect :: Process String
+  liftIO $ putStrLn hello
