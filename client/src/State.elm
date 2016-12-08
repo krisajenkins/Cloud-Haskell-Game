@@ -7,7 +7,7 @@ import WebSocket
 
 websocketEndpoint : String
 websocketEndpoint =
-    "ws://localhost:8000"
+    "ws://localhost:9000"
 
 
 init : Response Model Msg
