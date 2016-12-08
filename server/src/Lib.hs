@@ -42,14 +42,14 @@ data Echo =
   Echo String
   deriving (Show, Binary, Generic)
 
-echoProcess :: Process ()
-echoProcess = do
+echoProcess :: ReceivePort Echo -> Process ()
+echoProcess receiver = do
   liftIO $ putStrLn "ECHO SERVER STARTING"
   self <- getSelfPid -- get our own process id
   liftIO . putStrLn $ "ECHO SERVER IS: " <> show self
   forever $
-    do msg <- expect :: Process Echo
-       liftIO . putStrLn $ "ECHO: " <> show msg
+    do msg <- receiveChan receiver
+       liftIO . putStrLn $ "ECHO Process Heard: " <> show msg
 
 ------------------------------------------------------------
 remotable []
@@ -60,8 +60,8 @@ myRemoteTable = __remoteTable initRemoteTable
 ------------------------------------------------------------
 acceptClientConnection
   :: MonadResource m
-  => LocalNode -> ProcessId -> WS.PendingConnection -> m ()
-acceptClientConnection node echoProcessId pendingConnection = do
+  => LocalNode -> SendPort Echo -> WS.PendingConnection -> m ()
+acceptClientConnection node echoProcessChannel pendingConnection = do
   (_releaseKey, connection) <-
     allocate
       (runStdoutLoggingT $
@@ -73,7 +73,7 @@ acceptClientConnection node echoProcessId pendingConnection = do
     do myId <- myThreadId
        putStrLn ("My Thread: " ++ show myId)
        runProcess node $
-         do _ <- spawnLocal $ listenProcess echoProcessId connection
+         do _ <- spawnLocal $ listenProcess echoProcessChannel connection
             announceProcess connection
 
 runGame :: IO ()
@@ -90,16 +90,17 @@ runGame =
         _ <-
           liftIO $
           runProcess node $
-          do echoProcessId <- spawnLocal $ echoProcess
+          do (send, receive) <- newChan
+             echoProcessId <- spawnLocal $ echoProcess receive
              liftIO $
                WS.runServer host websocketPort $
-               runResourceT . acceptClientConnection node echoProcessId
+               runResourceT . acceptClientConnection node send
         logInfoN "END"
 
-listenProcess :: ProcessId -> WS.Connection -> Process ()
-listenProcess echoProcessId connection = do
+listenProcess :: SendPort Echo -> WS.Connection -> Process ()
+listenProcess echoProcessPort connection = do
   liftIO $ putStrLn "LISTENING"
-  send echoProcessId (Echo "Hello Echo Service I Am A Client")
+  sendChan echoProcessPort (Echo "Hello Echo Service I Am A Client")
   forever $
     do raw <- liftIO $ WS.receiveDataMessage connection
        case raw of
@@ -107,7 +108,7 @@ listenProcess echoProcessId connection = do
            liftIO $ putStrLn $ "HEARD: " <> show text
            let echo = Echo (show text)
            liftIO $ putStrLn ("SENDING TO ECHO: " <> show echo)
-           send echoProcessId echo
+           sendChan echoProcessPort echo
          WS.Binary _ -> return ()
 
 announceProcess ::  WS.Connection -> Process ()
