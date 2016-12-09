@@ -138,15 +138,15 @@ broadcastProcess inboundGame subscriptionRequests = do
   iterateM_ handle Set.empty
   where
     handle subscribers = do
-      liftIO . putStrLn $ "B: Broadcasting to: " <> show subscribers
+      liftIO . putStrLn $ "B: Subscribers: " <> show subscribers
       mergedPorts <-
-        mergePortsRR
+        mergePortsBiased
           [NewState <$> inboundGame, Subscription <$> subscriptionRequests]
       msg <- receiveChan mergedPorts
       case msg of
         NewState state -> do
-          liftIO . putStrLn $ "B: I should broadcast: " <> show state
-          liftIO . putStrLn $ "B: ...to: " <> show subscribers
+          liftIO . putStrLn $
+            "B: Broadcasting: " <> show state <> " to: " <> show subscribers
           traverse_ (`sendChan` state) $ Set.toList subscribers
           return subscribers
         Subscription (Sub subscriber) -> do
@@ -201,5 +201,6 @@ update msg state =
   { lastMsg = Just msg
   , msgCount = msgCount state + 1
   }
+
 view :: GameState -> GameState
 view = id
