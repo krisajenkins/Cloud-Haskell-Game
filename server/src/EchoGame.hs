@@ -4,15 +4,16 @@
 
 module EchoGame where
 
+import           Control.Distributed.Process
 import           Data.Binary
-import           Data.Text    (Text)
+import           Data.Text                   (Text)
 import           GHC.Generics
 
 ------------------------------------------------------------
 -- This Specific Game
 ------------------------------------------------------------
 data GameState = GameState
-  { lastMsg  :: Maybe Text
+  { lastMsg  :: Maybe (String, Text)
   , msgCount :: Int
   } deriving (Show, Eq, Binary, Generic)
 
@@ -23,14 +24,14 @@ init =
   , msgCount = 0
   }
 
-update :: Text -> GameState -> GameState
-update msg state =
+update :: (SendPortId, Text) -> GameState -> GameState
+update (portId,msg) state =
   GameState
-  { lastMsg = Just msg
+  { lastMsg = Just (show portId,msg)
   , msgCount = msgCount state + 1
   }
 
-type GameView = (Maybe Text, Int)
+type GameView = (Maybe (String, Text), Int)
 
 view :: GameState -> GameView
 view GameState {..} = (lastMsg, msgCount)

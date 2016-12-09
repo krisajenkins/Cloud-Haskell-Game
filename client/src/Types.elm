@@ -1,12 +1,15 @@
 module Types exposing (..)
 
 import Json.Encode as E
+import RemoteData exposing (RemoteData)
 
 
 type Msg
-    = Send String
-    | Receive (Result String E.Value)
+    = SetName String
+    | Join
+    | Leave
+    | Receive (RemoteData String E.Value)
 
 
 type alias Model =
-    { lastMsg : Maybe (Result String E.Value) }
+    { lastMsg : RemoteData String E.Value }

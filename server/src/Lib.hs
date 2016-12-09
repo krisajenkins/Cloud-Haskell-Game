@@ -4,7 +4,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Lib where
-
 import           Control.Distributed.Process
 import           Control.Distributed.Process.Debug
 import           Control.Distributed.Process.Node
@@ -14,14 +13,13 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Loops
 import           Control.Monad.Trans.Resource
-import           Data.Aeson                               (ToJSON)
+import           Data.Aeson                               (FromJSON, ToJSON)
 import qualified Data.Aeson                               as Aeson
 import           Data.Binary
 import           Data.Foldable
 import           Data.Monoid
 import qualified Data.Set                                 as Set
 import           Data.Text                                (Text)
-import qualified Data.Text                                as T
 import qualified Data.Text.Lazy                           as LT
 import qualified Data.Text.Lazy.Encoding                  as LTE
 import           GHC.Generics
@@ -31,12 +29,34 @@ import qualified Network.WebSockets                       as WS
 -- TODO Could really do with some monitoring.
 -- TODO JSON Handling.
 -- TODO All the channel/process names are horrible.
+
+data EngineMsg msg view
+  = GameMetaMsg msg
+  | BroadcasterMsg (PubSubMsg view)
+  deriving (Show, Eq, Binary, Generic)
+
+data PubSubMsg a
+  = Sub (SendPort a)
+  | Unsub (SendPort a)
+  deriving (Show, Eq, Binary, Generic)
+
+
 ------------------------------------------------------------
 -- Websocket Server & Wiring.
 ------------------------------------------------------------
 runGame
-  :: (Serializable state, Serializable view, Show view, ToJSON view)
-  => (Text -> state -> state) -> (state -> view) -> state -> IO ()
+  :: (Serializable msg
+     ,Serializable state
+     ,Serializable view
+     ,Show view
+     ,Show state
+     ,FromJSON msg
+     ,Show msg
+     ,ToJSON view)
+  => ((SendPortId, msg) -> state -> state)
+  -> (state -> view)
+  -> state
+  -> IO ()
 runGame update view initialGameState =
   let host = "0.0.0.0"
       websocketPort = 9000
@@ -60,10 +80,16 @@ runGame update view initialGameState =
         logInfoN "END"
 
 acceptClientConnection
-  :: (MonadResource m, Serializable state, Show state,ToJSON state)
+  :: (MonadResource m
+     ,Serializable view
+     ,Show view
+     ,ToJSON view
+     ,Serializable msg
+     ,Show msg
+     ,FromJSON msg)
   => LocalNode
-  -> SendPort Text
-  -> SendPort (PubSubMsg state)
+  -> SendPort (SendPortId , msg)
+  -> SendPort (PubSubMsg view)
   -> WS.PendingConnection
   -> m ()
 acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
@@ -85,10 +111,10 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
 ------------------------------------------------------------
 -- TODO Here we will decode GameMsgs from the JSON.
 receiveFromPlayerProcess
-  :: (Serializable state, Show state)
-  => SendPort (PubSubMsg state)
-  -> SendPort state
-  -> SendPort Text
+  :: (Serializable view, Show view, Serializable msg, Show msg, FromJSON msg)
+  => SendPort (PubSubMsg view)
+  -> SendPort view
+  -> SendPort (SendPortId, msg)
   -> WS.Connection
   -> Process ()
 receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
@@ -105,8 +131,14 @@ receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
         Right (WS.Binary _) -> handle
         Right (WS.Text text) -> do
           liftIO . putStrLn $ "P: HEARD: " <> show text
-          sendChan txGameMsg $ LT.toStrict (LTE.decodeUtf8 text)
-          handle
+          case Aeson.eitherDecode text of
+            Left err -> do
+              liftIO . putStrLn $ "Couldn't understand: " <> show text
+              liftIO . putStrLn $ "  Error was: " <> show err
+              handle
+            Right msg -> do
+              sendChan txGameMsg $ (sendPortId sendToMe, msg)
+              handle
 
 -- TODO Here we will encode the GameState to JSON.
 announceToPlayerProcess
@@ -120,21 +152,10 @@ announceToPlayerProcess connection rx =
 ------------------------------------------------------------
 -- Broadcaster
 ------------------------------------------------------------
-data PubSubMsg a
-  = Sub (SendPort a)
-  | Unsub (SendPort a)
-  deriving (Show, Eq, Binary, Generic)
-
 broadcastProcess
-  :: (Show a, Serializable a)
-  => ReceivePort a -> ReceivePort (PubSubMsg a) -> Process b
-broadcastProcess inboundGame subscriptionRequests = do
-  setTraceFlags $
-    defaultTraceFlags
-    { traceSpawned = traceOn
-    , traceRecv = traceOn
-    }
-  iterateM_ handle Set.empty
+  :: (Show view, Serializable view)
+  => ReceivePort view -> ReceivePort (PubSubMsg view) -> Process ()
+broadcastProcess inboundGame subscriptionRequests = iterateM_ handle Set.empty
   where
     handle subscribers = do
       liftIO . putStrLn $ "B: Subscribers: " <> show subscribers
@@ -158,18 +179,19 @@ broadcastProcess inboundGame subscriptionRequests = do
 -- Game
 ------------------------------------------------------------
 gameProcess
-  :: (Show msg, Serializable msg, Serializable view)
-  => ReceivePort msg
+  :: (Show msg, Serializable msg, Serializable view, Show state)
+  => ReceivePort (SendPortId, msg)
   -> SendPort view
-  -> (msg -> state -> state)
+  -> ((SendPortId, msg) -> state -> state)
   -> (state -> view)
   -> state
   -> Process ()
 gameProcess rxGameMsg txGameState updateFn viewFn = iterateM_ handle
   where
     handle game = do
-      msg <- receiveChan rxGameMsg
+      (replyTo, msg) <- receiveChan rxGameMsg
       liftIO . putStrLn $ "G: Heard: " <> show msg
-      let newGame = updateFn msg game
+      liftIO . putStrLn $ "G: Game: " <> show game
+      let newGame = updateFn (replyTo, msg) game
       sendChan txGameState (viewFn newGame)
       return newGame

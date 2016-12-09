@@ -15,14 +15,20 @@ root model =
             ]
         , button
             [ type_ "button"
-            , onClick (Send "Hello")
+            , onClick Join
             ]
-            [ text "Hello"
+            [ text "Join"
             ]
         , button
             [ type_ "button"
-            , onClick (Send "Goodbye")
+            , onClick Leave
             ]
-            [ text "Goodbye"
+            [ text "Leave"
+            ]
+        , button
+            [ type_ "button"
+            , onClick (SetName "Kris")
+            ]
+            [ text "Set Name"
             ]
         ]
