@@ -35,7 +35,7 @@ import qualified Network.WebSockets                       as WS
 ------------------------------------------------------------
 runGame :: IO ()
 runGame =
-  let host = "127.0.0.1"
+  let host = "0.0.0.0"
       websocketPort = 9000
   in runStdoutLoggingT $
      do logInfoN "START"
