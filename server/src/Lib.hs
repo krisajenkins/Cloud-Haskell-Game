@@ -51,7 +51,7 @@ runGame =
              (sendGameMsg, receiveGameMsg) <- newChan
              _ <- spawnLocal $ broadcastProcess rxGameState receiveSubGameState
              _ <-
-               spawnLocal $ gameProcess update view receiveGameMsg txGameState initialGameState
+               spawnLocal $ gameProcess receiveGameMsg txGameState update view initialGameState
              liftIO . WS.runServer host websocketPort $
                runResourceT . acceptClientConnection node sendGameMsg sendSubGameState
         logInfoN "END"
@@ -160,14 +160,14 @@ broadcastProcess inboundGame subscriptionRequests = do
 -- Game
 ------------------------------------------------------------
 gameProcess
-  :: (Show msg, Serializable msg, Serializable a, Serializable b)
-  => (msg -> a -> a)
-  -> (a -> b)
-  -> ReceivePort msg
-  -> SendPort b
-  -> a
+  :: (Show msg, Serializable msg, Serializable view)
+  => ReceivePort msg
+  -> SendPort view
+  -> (msg -> state -> state)
+  -> (state -> view)
+  -> state
   -> Process ()
-gameProcess updateFn viewFn rxGameMsg txGameState = iterateM_ handle
+gameProcess rxGameMsg txGameState updateFn viewFn = iterateM_ handle
   where
     handle game = do
       msg <- receiveChan rxGameMsg
