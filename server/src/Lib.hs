@@ -2,15 +2,17 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
 
 module Lib where
 
 import           Control.Distributed.Process
+import           Control.Distributed.Process.Debug
 import           Control.Distributed.Process.Node
 import           Control.Distributed.Process.Serializable
+import qualified Control.Exception                        as Ex
 import           Control.Monad
 import           Control.Monad.Logger
+import           Control.Monad.Loops
 import           Control.Monad.Trans.Resource
 import           Data.Binary
 import           Data.Foldable
@@ -24,10 +26,10 @@ import           GHC.Generics
 import           Network.Transport.InMemory
 import qualified Network.WebSockets                       as WS
 
--- TODO All the channel/process names are horrible.
--- TODO Disconnections don't detatch from the broadcaster, which sounds wrong.
 -- TODO Could really do with some monitoring.
-
+-- TODO All the channel/process names are horrible.
+------------------------------------------------------------
+-- Websocket Server & Wiring.
 ------------------------------------------------------------
 runGame :: IO ()
 runGame =
@@ -46,7 +48,8 @@ runGame =
              (txGameState, rxGameState) <- newChan
              (sendGameMsg, receiveGameMsg) <- newChan
              _ <- spawnLocal $ broadcastProcess rxGameState receiveSubGameState
-             _ <- spawnLocal $ gameProcess receiveGameMsg txGameState initialGameState
+             _ <-
+               spawnLocal $ gameProcess update view receiveGameMsg txGameState initialGameState
              liftIO . WS.runServer host websocketPort $
                runResourceT . acceptClientConnection node sendGameMsg sendSubGameState
         logInfoN "END"
@@ -55,33 +58,49 @@ acceptClientConnection
   :: MonadResource m
   => LocalNode
   -> SendPort GameMsg
-  -> SendPort (SendPort GameState)
+  -> SendPort (PubSubMsg GameState)
   -> WS.PendingConnection
   -> m ()
 acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
   (_releaseKey, connection) <-
     allocate
       (runStdoutLoggingT $
-       do logInfoN "New connection received."
+       do liftIO . putStrLn $ "P: New connection received."
           liftIO $ WS.acceptRequest pendingConnection)
-      (\_ -> runStdoutLoggingT $ logInfoN "Leaves")
+      (\_ -> putStrLn "P: Leaves")
   liftIO . runProcess node $
-    do _ <- spawnLocal $ receiveFromPlayerProcess txGameMsg connection
-       (sendToMe, receiveFromBroadcaster) <- newChan
-       sendChan txSubscribe sendToMe
+    do (sendToMe, receiveFromBroadcaster) <- newChan
+       _ <-
+         spawnLocal $ receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection
+       sendChan txSubscribe (Sub sendToMe)
        announceToPlayerProcess connection receiveFromBroadcaster
 
+------------------------------------------------------------
+-- Player
+------------------------------------------------------------
 -- TODO Here we will decode GameMsgs from the JSON.
-receiveFromPlayerProcess :: SendPort GameMsg -> WS.Connection -> Process ()
-receiveFromPlayerProcess txGameMsg connection = do
-  liftIO $ putStrLn "LISTENING"
-  forever $
-    do raw <- liftIO $ WS.receiveDataMessage connection
-       case raw of
-         WS.Binary _ -> return ()
-         WS.Text text -> do
-           liftIO . putStrLn $ "HEARD: " <> show text
-           sendChan txGameMsg $ GameMsg (LT.toStrict (LTE.decodeUtf8 text))
+receiveFromPlayerProcess
+  :: SendPort (PubSubMsg GameState)
+  -> SendPort GameState
+  -> SendPort GameMsg
+  -> WS.Connection
+  -> Process ()
+receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
+  liftIO $ putStrLn "P: LISTENING"
+  handle
+  where
+    handle = do
+      raw :: Either WS.ConnectionException WS.DataMessage <-
+        liftIO . Ex.try $ WS.receiveDataMessage connection
+      case raw of
+        Left ex -> do
+          liftIO . putStrLn $ "P: Socket has closed. Unsubscribing: " <> show ex
+          sendChan txSubscribe (Unsub sendToMe)
+        Right (WS.Binary _) -> handle
+        Right (WS.Text text) -> do
+          liftIO . putStrLn $ "P: HEARD: " <> show text
+          sendChan txGameMsg $ GameMsg (LT.toStrict (LTE.decodeUtf8 text))
+          handle
 
 -- TODO Here we will encode the GameState to JSON.
 announceToPlayerProcess
@@ -92,32 +111,71 @@ announceToPlayerProcess connection rx =
   do msg <- receiveChan rx
      liftIO $ WS.sendTextData connection (T.pack (show msg))
 
+------------------------------------------------------------
+-- Broadcaster
+------------------------------------------------------------
+data PubSubMsg a
+  = Sub (SendPort a)
+  | Unsub (SendPort a)
+  deriving (Show, Eq, Binary, Generic)
+
 data BroadcasterMsg a
   = NewState a
-  | Subscribe (SendPort a)
+  | Subscription (PubSubMsg a)
   deriving (Show, Eq, Binary, Generic)
 
 broadcastProcess
   :: (Show a, Serializable a)
-  => ReceivePort a -> ReceivePort (SendPort a) -> Process b
-broadcastProcess inboundGame subscriptionRequests = loop Set.empty
+  => ReceivePort a -> ReceivePort (PubSubMsg a) -> Process b
+broadcastProcess inboundGame subscriptionRequests = do
+  setTraceFlags $
+    defaultTraceFlags
+    { traceSpawned = traceOn
+    , traceRecv = traceOn
+    }
+  iterateM_ handle Set.empty
   where
-    loop subscribers = do
+    handle subscribers = do
       liftIO . putStrLn $ "B: Broadcasting to: " <> show subscribers
       mergedPorts <-
         mergePortsRR
-          [NewState <$> inboundGame, Subscribe <$> subscriptionRequests]
+          [NewState <$> inboundGame, Subscription <$> subscriptionRequests]
       msg <- receiveChan mergedPorts
       case msg of
         NewState state -> do
           liftIO . putStrLn $ "B: I should broadcast: " <> show state
           liftIO . putStrLn $ "B: ...to: " <> show subscribers
           traverse_ (`sendChan` state) $ Set.toList subscribers
-          loop subscribers
-        Subscribe newSubscriber -> do
-          liftIO . putStrLn $ "B: adding: " <> show newSubscriber
-          loop (Set.insert newSubscriber subscribers)
+          return subscribers
+        Subscription (Sub subscriber) -> do
+          liftIO . putStrLn $ "B: adding: " <> show subscriber
+          return (Set.insert subscriber subscribers)
+        Subscription (Unsub subscriber) -> do
+          liftIO . putStrLn $ "B: removing: " <> show subscriber
+          return (Set.delete subscriber subscribers)
 
+------------------------------------------------------------
+-- Game
+------------------------------------------------------------
+gameProcess
+  :: (Show msg, Serializable msg, Serializable a, Serializable b)
+  => (msg -> a -> a)
+  -> (a -> b)
+  -> ReceivePort msg
+  -> SendPort b
+  -> a
+  -> Process ()
+gameProcess updateFn viewFn rxGameMsg txGameState = iterateM_ handle
+  where
+    handle game = do
+      msg <- receiveChan rxGameMsg
+      liftIO . putStrLn $ "G: Heard: " <> show msg
+      let newGame = updateFn msg game
+      sendChan txGameState (viewFn newGame)
+      return newGame
+
+------------------------------------------------------------
+-- This Specific Game
 ------------------------------------------------------------
 data GameMsg =
   GameMsg Text
@@ -135,20 +193,11 @@ initialGameState =
   , msgCount = 0
   }
 
--- TODO Here we could split out a pure handler function.
-gameProcess :: ReceivePort GameMsg
-            -> SendPort GameState
-            -> GameState
-            -> Process ()
-gameProcess rxGameMsg txGameState = loop
-  where
-    loop game = do
-      msg <- receiveChan rxGameMsg
-      liftIO . putStrLn $ "G: Heard: " <> show msg
-      let newGame =
-            GameState
-            { lastMsg = Just msg
-            , msgCount = msgCount game + 1
-            }
-      sendChan txGameState newGame
-      loop newGame
+update :: GameMsg -> GameState -> GameState
+update msg state =
+  GameState
+  { lastMsg = Just msg
+  , msgCount = msgCount state + 1
+  }
+view :: GameState -> GameState
+view = id

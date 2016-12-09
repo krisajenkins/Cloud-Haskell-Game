@@ -30,6 +30,7 @@ library
                      , lens
                      , megaparsec
                      , monad-logger
+                     , monad-loops
                      , mtl
                      , random
                      , resourcet
