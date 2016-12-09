@@ -27,6 +27,8 @@ import           Network.Transport.InMemory
 import qualified Network.WebSockets                       as WS
 
 -- TODO Could really do with some monitoring.
+-- TODO JSON Handling.
+-- TODO Separation of Game Logic.
 -- TODO All the channel/process names are horrible.
 ------------------------------------------------------------
 -- Websocket Server & Wiring.
