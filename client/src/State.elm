@@ -1,5 +1,6 @@
 module State exposing (init, update, subscriptions)
 
+import Json.Decode as D
 import Response exposing (..)
 import Types exposing (..)
 import WebSocket
@@ -33,4 +34,4 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    WebSocket.listen websocketEndpoint Receive
+    WebSocket.listen websocketEndpoint (D.decodeString D.value >> Receive)

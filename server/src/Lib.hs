@@ -14,6 +14,8 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Loops
 import           Control.Monad.Trans.Resource
+import           Data.Aeson                               (ToJSON)
+import qualified Data.Aeson                               as Aeson
 import           Data.Binary
 import           Data.Foldable
 import           Data.Monoid
@@ -28,13 +30,14 @@ import qualified Network.WebSockets                       as WS
 
 -- TODO Could really do with some monitoring.
 -- TODO JSON Handling.
--- TODO Separation of Game Logic.
 -- TODO All the channel/process names are horrible.
 ------------------------------------------------------------
 -- Websocket Server & Wiring.
 ------------------------------------------------------------
-runGame :: IO ()
-runGame =
+runGame
+  :: (Serializable state, Serializable view, Show view, ToJSON view)
+  => (Text -> state -> state) -> (state -> view) -> state -> IO ()
+runGame update view initialGameState =
   let host = "0.0.0.0"
       websocketPort = 9000
   in runStdoutLoggingT $
@@ -57,10 +60,10 @@ runGame =
         logInfoN "END"
 
 acceptClientConnection
-  :: MonadResource m
+  :: (MonadResource m, Serializable state, Show state,ToJSON state)
   => LocalNode
-  -> SendPort GameMsg
-  -> SendPort (PubSubMsg GameState)
+  -> SendPort Text
+  -> SendPort (PubSubMsg state)
   -> WS.PendingConnection
   -> m ()
 acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
@@ -82,9 +85,10 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
 ------------------------------------------------------------
 -- TODO Here we will decode GameMsgs from the JSON.
 receiveFromPlayerProcess
-  :: SendPort (PubSubMsg GameState)
-  -> SendPort GameState
-  -> SendPort GameMsg
+  :: (Serializable state, Show state)
+  => SendPort (PubSubMsg state)
+  -> SendPort state
+  -> SendPort Text
   -> WS.Connection
   -> Process ()
 receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
@@ -101,17 +105,17 @@ receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
         Right (WS.Binary _) -> handle
         Right (WS.Text text) -> do
           liftIO . putStrLn $ "P: HEARD: " <> show text
-          sendChan txGameMsg $ GameMsg (LT.toStrict (LTE.decodeUtf8 text))
+          sendChan txGameMsg $ LT.toStrict (LTE.decodeUtf8 text)
           handle
 
 -- TODO Here we will encode the GameState to JSON.
 announceToPlayerProcess
-  :: (Show a, Serializable a)
-  => WS.Connection -> ReceivePort a -> Process b
+  :: (Show view, Serializable view, ToJSON view)
+  => WS.Connection -> ReceivePort view -> Process ()
 announceToPlayerProcess connection rx =
   forever $
   do msg <- receiveChan rx
-     liftIO $ WS.sendTextData connection (T.pack (show msg))
+     liftIO $ WS.sendTextData connection (Aeson.encode msg)
 
 ------------------------------------------------------------
 -- Broadcaster
@@ -119,11 +123,6 @@ announceToPlayerProcess connection rx =
 data PubSubMsg a
   = Sub (SendPort a)
   | Unsub (SendPort a)
-  deriving (Show, Eq, Binary, Generic)
-
-data BroadcasterMsg a
-  = NewState a
-  | Subscription (PubSubMsg a)
   deriving (Show, Eq, Binary, Generic)
 
 broadcastProcess
@@ -140,19 +139,18 @@ broadcastProcess inboundGame subscriptionRequests = do
     handle subscribers = do
       liftIO . putStrLn $ "B: Subscribers: " <> show subscribers
       mergedPorts <-
-        mergePortsBiased
-          [NewState <$> inboundGame, Subscription <$> subscriptionRequests]
+        mergePortsBiased [Left <$> inboundGame, Right <$> subscriptionRequests]
       msg <- receiveChan mergedPorts
       case msg of
-        NewState state -> do
+        Left state -> do
           liftIO . putStrLn $
             "B: Broadcasting: " <> show state <> " to: " <> show subscribers
           traverse_ (`sendChan` state) $ Set.toList subscribers
           return subscribers
-        Subscription (Sub subscriber) -> do
+        Right (Sub subscriber) -> do
           liftIO . putStrLn $ "B: adding: " <> show subscriber
           return (Set.insert subscriber subscribers)
-        Subscription (Unsub subscriber) -> do
+        Right (Unsub subscriber) -> do
           liftIO . putStrLn $ "B: removing: " <> show subscriber
           return (Set.delete subscriber subscribers)
 
@@ -175,32 +173,3 @@ gameProcess rxGameMsg txGameState updateFn viewFn = iterateM_ handle
       let newGame = updateFn msg game
       sendChan txGameState (viewFn newGame)
       return newGame
-
-------------------------------------------------------------
--- This Specific Game
-------------------------------------------------------------
-data GameMsg =
-  GameMsg Text
-  deriving (Show, Eq, Binary, Generic)
-
-data GameState = GameState
-  { lastMsg  :: Maybe GameMsg
-  , msgCount :: Int
-  } deriving (Show, Eq, Binary, Generic)
-
-initialGameState :: GameState
-initialGameState =
-  GameState
-  { lastMsg = Nothing
-  , msgCount = 0
-  }
-
-update :: GameMsg -> GameState -> GameState
-update msg state =
-  GameState
-  { lastMsg = Just msg
-  , msgCount = msgCount state + 1
-  }
-
-view :: GameState -> GameState
-view = id
