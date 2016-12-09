@@ -1,6 +1,8 @@
 module State exposing (init, update, subscriptions)
 
-import Json.Decode as D
+import Json.Decode as D exposing (Decoder)
+import Json.Decode exposing (Decoder)
+import Json.Decode.Pipeline exposing (decode, required)
 import Json.Encode as E
 import RemoteData exposing (RemoteData(..))
 import Response exposing (..)
@@ -15,9 +17,7 @@ websocketEndpoint =
 
 init : Response Model Msg
 init =
-    ( { lastMsg = NotAsked }
-    , Cmd.none
-    )
+    ( NotAsked, Cmd.none )
 
 
 update : Msg -> Model -> Response Model Msg
@@ -46,12 +46,57 @@ update msg model =
                 )
             )
 
+        Move to ->
+            ( model
+            , WebSocket.send websocketEndpoint
+                (E.object
+                    [ ( "tag", E.string "Move" )
+                    , ( "contents"
+                      , E.object
+                            [ ( "_x", E.float to.x )
+                            , ( "_y", E.float to.y )
+                            ]
+                      )
+                    ]
+                    |> E.encode 0
+                )
+            )
+
         Receive response ->
-            ( { model | lastMsg = response }
+            ( response
             , Cmd.none
             )
 
 
+decodeCoords : Decoder Coords
+decodeCoords =
+    decode Coords
+        |> required "x" D.float
+        |> required "y" D.float
+
+
+decodeRadar : Decoder Radar
+decodeRadar =
+    decode Radar
+        |> required "distance" D.float
+        |> required "position" decodeCoords
+
+
+decodePlayer : Decoder Player
+decodePlayer =
+    decode Player
+        |> required "name" D.string
+        |> required "score" D.int
+        |> required "position" decodeCoords
+
+
+decodeBoard : Decoder Board
+decodeBoard =
+    decode Board
+        |> required "radars" (D.list decodeRadar)
+        |> required "players" (D.list decodePlayer)
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    WebSocket.listen websocketEndpoint (D.decodeString D.value >> RemoteData.fromResult >> Receive)
+    WebSocket.listen websocketEndpoint (D.decodeString decodeBoard >> RemoteData.fromResult >> Receive)

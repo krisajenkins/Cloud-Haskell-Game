@@ -42,3 +42,18 @@ User
 -> Websocket
 -> User
 ```
+
+## TODO
+- [ ] Check win condition.
+- [ ] Respawn present.
+
+- [ ] Move radars.
+- [ ] Make radars unreliable.
+- [ ] Pretty view.
+- [ ] Easier command format.
+- [ ] Leave on disconnect.
+- [ ] Join on connect. Send board.
+
+- [X] Include radars in view.
+- [ ] Could really do with some proper monitoring.
+- [ ] All the channel/process names are horrible.

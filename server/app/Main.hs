@@ -11,4 +11,5 @@ oldMain :: IO ()
 oldMain = Lib.runGame EchoGame.update EchoGame.view EchoGame.init
 
 main :: IO ()
-main = Lib.runGame PresentDrop.update PresentDrop.view PresentDrop.init
+main =
+  Lib.runGame PresentDrop.update PresentDrop.view PresentDrop.init
