@@ -44,18 +44,25 @@ User
 ```
 
 ## TODO
-- [ ] Check win condition.
-- [ ] Respawn present.
+- [X] Check win condition.
+- [X] Respawn present.
+- [X] Randomise present.
+- [X] Throttle commands.
+- [X] Set color.
+- [X] Normalize move distance.
+
+- [ ] Deploy
+- [ ] Send board on connect.
+- [ ] Visualise
 
 - [ ] Join & Leave aren't useful. Pub and sub would be.
-- [ ] Look command.
-- [ ] Move radars.
-- [ ] Make radars unreliable.
-- [ ] Pretty view.
-- [ ] Easier command format.
 - [ ] Leave on disconnect.
 - [ ] Join on connect. Send board.
+- [ ] Look command. (Broadcaster could hold the last-seen state.)
+
+- [ ] Make one radar unreliable.
 
 - [X] Include radars in view.
 - [ ] Could really do with some proper monitoring.
 - [ ] All the channel/process names are horrible.
+- [ ] Refactor.
