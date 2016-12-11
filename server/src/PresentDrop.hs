@@ -17,7 +17,22 @@ import           Data.Binary
 import           Data.Map.Strict             (Map)
 import qualified Data.Map.Strict             as Map
 import           Data.Text                   (Text)
+import           Data.Text.Encoding
 import           GHC.Generics
+import           System.Random
+import qualified Text.Regex.PCRE.Light       as Regex
+
+data CssColor = CssColor Text
+  deriving (Show, Eq, Binary, Generic, FromJSON)
+
+mkCssColor :: Text -> Maybe CssColor
+mkCssColor text =
+  case Regex.match cssColorRegex (encodeUtf8 text) [] of
+    Nothing -> Nothing
+    Just _ -> Just (CssColor text)
+  where
+    cssColorRegex :: Regex.Regex
+    cssColorRegex = Regex.compile "^#[0-9a-f]{6}$" [Regex.caseless]
 
 data Coords = Coords
   { _x :: Double
@@ -28,19 +43,24 @@ data Player = Player
   { _position :: Coords
   , _score    :: Integer
   , _name     :: Text
+  , _color    :: Maybe CssColor
   } deriving (Show, Eq, Binary, Generic)
 
 data Model = Model
   { _players :: Map SendPortId Player
   , _gpss    :: [Coords]
   , _present :: Coords
-  } deriving (Show, Eq, Binary, Generic)
+  , _rng     :: StdGen
+  } deriving (Show)
 
 makeLenses ''Coords
 
 makeLenses ''Player
 
 makeLenses ''Model
+
+instance ToJSON CssColor where
+  toJSON = genericToJSON $ aesonDrop 1 camelCase
 
 instance ToJSON Coords where
   toJSON = genericToJSON $ aesonDrop 1 camelCase
@@ -65,12 +85,13 @@ instance ToJSON View where
 instance ToJSON ViewGps where
   toJSON = genericToJSON $ aesonDrop 7 camelCase
 
-init :: Model
-init =
+init :: StdGen ->  Model
+init stdGen =
   Model
   { _players = Map.empty
   , _gpss = [Coords (-10) (-15), Coords 3 (-5), Coords 12 3]
   , _present = Coords 5 3
+  , _rng = stdGen
   }
 
 newPlayer :: Player
@@ -79,33 +100,43 @@ newPlayer =
   { _name = "<Your Name Here>"
   , _score = 0
   , _position = Coords 0 0
+  , _color = Nothing
   }
 
 data Msg
   = Join
   | Leave
   | SetName Text
+  | SetColor Text
   | Move Coords
   deriving (Show, Eq, Binary, Generic, FromJSON, ToJSON)
 
 update :: (SendPortId, Msg) -> Model -> Model
 update msg = handleWin . handleMsg msg
 
+randomPair
+  :: (RandomGen g, Random a)
+  => (a, a) -> g -> ((a, a), g)
+randomPair range stdGen = ((a, b), stdGen'')
+  where
+    (a, stdGen') = randomR range stdGen
+    (b, stdGen'') = randomR range stdGen'
+
+
 handleWin :: Model -> Model
 handleWin model =
   if null overlappingPlayers
     then model
-    else let modelWithIncrementedScores =
+    else let ((newX, newY), stdGen) = randomPair (-10, 10) $ Lens.view rng model
+             withIncrementedScores aModel =
                Map.foldlWithKey
-                 (\model' portId _ -> over (players . ix portId . score) (+ 1) model')
-                 model
+                 (\aModel' portId _ ->
+                     over (players . ix portId . score) (+ 1) aModel')
+                 aModel
                  overlappingPlayers
-             modelWithScoresAndMovesPresent =
-               over present randomisePresentPosition modelWithIncrementedScores
-             randomisePresentPosition :: Coords -> Coords
-             randomisePresentPosition (Coords {_x
-                                              ,_y}) = Coords _y _x -- TODO This is rubbish randomisation!
-         in modelWithScoresAndMovesPresent
+             withMovedPresent = set present (Coords newX newY)
+             withNewStdGen = set rng stdGen
+         in withNewStdGen . withMovedPresent . withIncrementedScores $ model
   where
     overlappingPlayers :: Map SendPortId Player
     overlappingPlayers = Map.filter inRange (Lens.view players model)
@@ -126,19 +157,27 @@ handleMsg (playerId, Join) model =
 handleMsg (playerId, Leave) model = set (players . at playerId) Nothing model
 handleMsg (playerId, SetName newName) model =
   set (players . ix playerId . name) newName model
+handleMsg (playerId, SetColor text) model =
+  set (players . ix playerId . color) (mkCssColor text) model
 handleMsg (playerId, Move moveTo) model =
   over (players . ix playerId . position) updatePosition model
   where
-    updatePosition = over x ((+) dx) . over y ((+) dy)
-    dx = max (-1) $ min 1 $ Lens.view x moveTo
-    dy = max (-1) $ min 1 $ Lens.view y moveTo
+    updatePosition = over x (dx +) . over y (dy +)
+    dx = max (-1) . min 1 $ Lens.view x moveTo
+    dy = max (-1) . min 1 $ Lens.view y moveTo
 
 view :: Model -> View
 view model =
   View
   { viewPlayers = toListOf (players . traverse) model
   , viewGpss = viewGps (Lens.view present model) <$> Lens.view gpss model
-  , viewSampleCommands = [Join, Leave, SetName "Kris", Move $ Coords 1.0 (-2.0)]
+  , viewSampleCommands =
+    [ Join
+    , Leave
+    , SetName "Kris"
+    , Move $ Coords 1.0 (-2.0)
+    , SetColor "#ff0000"
+    ]
   }
 
 viewGps :: Coords -> Coords -> ViewGps

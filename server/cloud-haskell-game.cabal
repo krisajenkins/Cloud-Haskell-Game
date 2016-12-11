@@ -22,6 +22,7 @@ library
                      , MonadRandom
                      , aeson
                      , aeson-casing
+                     , pcre-light
                      , binary
                      , bytestring
                      , distributed-process
@@ -54,6 +55,7 @@ executable cloud-haskell-game
   build-depends:       base
                      , cloud-haskell-game
                      , aeson
+                     , random
   default-language:    Haskell2010
 
 test-suite cloud-haskell-game-test

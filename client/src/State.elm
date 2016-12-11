@@ -46,6 +46,17 @@ update msg model =
                 )
             )
 
+        SetColor string ->
+            ( model
+            , WebSocket.send websocketEndpoint
+                (E.object
+                    [ ( "tag", E.string "SetColor" )
+                    , ( "contents", E.string string )
+                    ]
+                    |> E.encode 0
+                )
+            )
+
         Move to ->
             ( model
             , WebSocket.send websocketEndpoint

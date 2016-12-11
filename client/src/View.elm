@@ -92,6 +92,12 @@ controls =
             ]
         , button
             [ type_ "button"
+            , onClick (SetColor "#0000ff")
+            ]
+            [ text "Set Color"
+            ]
+        , button
+            [ type_ "button"
             , onClick <| Move <| Coords 1.2 4.1
             ]
             [ text "Move 1.2 4.1"

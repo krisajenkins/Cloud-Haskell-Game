@@ -40,7 +40,6 @@ data PubSubMsg a
 ------------------------------------------------------------
 runGame
   :: (Serializable msg
-     ,Serializable state
      ,Serializable view
      ,Show view
      ,Show state
