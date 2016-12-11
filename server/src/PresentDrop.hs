@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -7,12 +8,14 @@
 module PresentDrop where
 
 import           Control.Distributed.Process
-import           Control.Lens                as Lens
+import           Control.Lens                (at, ix, makeLenses, over, set,
+                                              toListOf)
+import qualified Control.Lens                as Lens
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Binary
-import           Data.Map.Lazy               (Map)
-import qualified Data.Map.Lazy               as Map
+import           Data.Map.Strict             (Map)
+import qualified Data.Map.Strict             as Map
 import           Data.Text                   (Text)
 import           GHC.Generics
 
@@ -29,7 +32,7 @@ data Player = Player
 
 data Model = Model
   { _players :: Map SendPortId Player
-  , _radars  :: [Coords]
+  , _gpss    :: [Coords]
   , _present :: Coords
   } deriving (Show, Eq, Binary, Generic)
 
@@ -40,33 +43,33 @@ makeLenses ''Player
 makeLenses ''Model
 
 instance ToJSON Coords where
-  toJSON = genericToJSON $ aesonDrop 1 id
+  toJSON = genericToJSON $ aesonDrop 1 camelCase
 
 instance ToJSON Player where
-  toJSON = genericToJSON $ aesonDrop 1 id
+  toJSON = genericToJSON $ aesonDrop 1 camelCase
 
 data View = View
   { viewPlayers        :: [Player]
-  , viewRadars         :: [ViewRadar]
+  , viewGpss           :: [ViewGps]
   , viewSampleCommands :: [Msg]
   } deriving (Show, Eq, Binary, Generic)
 
-data ViewRadar = ViewRadar
-  { viewRadarPosition :: Coords
-  , viewRadarDistance :: Double
+data ViewGps = ViewGps
+  { viewGpsPosition :: Coords
+  , viewGpsDistance :: Double
   } deriving (Show, Eq, Binary, Generic)
 
 instance ToJSON View where
-  toJSON = genericToJSON $ aesonDrop 4 camelCase
+  toJSON = genericToJSON $ aesonPrefix camelCase
 
-instance ToJSON ViewRadar where
-  toJSON = genericToJSON $ aesonDrop 9 camelCase
+instance ToJSON ViewGps where
+  toJSON = genericToJSON $ aesonDrop 7 camelCase
 
 init :: Model
 init =
   Model
   { _players = Map.empty
-  , _radars = [Coords (-10) (-15), Coords 3 (-5), Coords 12 3]
+  , _gpss = [Coords (-10) (-15), Coords 3 (-5), Coords 12 3]
   , _present = Coords 5 3
   }
 
@@ -86,7 +89,30 @@ data Msg
   deriving (Show, Eq, Binary, Generic, FromJSON, ToJSON)
 
 update :: (SendPortId, Msg) -> Model -> Model
-update = handleMsg
+update msg = handleWin . handleMsg msg
+
+handleWin :: Model -> Model
+handleWin model =
+  if null overlappingPlayers
+    then model
+    else let modelWithIncrementedScores =
+               Map.foldlWithKey
+                 (\model' portId _ -> over (players . ix portId . score) (+ 1) model')
+                 model
+                 overlappingPlayers
+             modelWithScoresAndMovesPresent =
+               over present randomisePresentPosition modelWithIncrementedScores
+             randomisePresentPosition :: Coords -> Coords
+             randomisePresentPosition (Coords {_x
+                                              ,_y}) = Coords _y _x -- TODO This is rubbish randomisation!
+         in modelWithScoresAndMovesPresent
+  where
+    overlappingPlayers :: Map SendPortId Player
+    overlappingPlayers = Map.filter inRange (Lens.view players model)
+    inRange :: Player -> Bool
+    inRange player =
+      distanceBetween (Lens.view present model) (Lens.view position player) < 0.5
+
 
 distanceBetween :: Coords -> Coords -> Double
 distanceBetween a b = sqrt $ (dx ^ (2 :: Int)) + (dy ^ (2 :: Int))
@@ -111,13 +137,13 @@ view :: Model -> View
 view model =
   View
   { viewPlayers = toListOf (players . traverse) model
-  , viewRadars = viewRadar (Lens.view present model) <$> Lens.view radars model
-  , viewSampleCommands = [Join, Leave, SetName "Kris", Move $ Coords 1.2 5.3]
+  , viewGpss = viewGps (Lens.view present model) <$> Lens.view gpss model
+  , viewSampleCommands = [Join, Leave, SetName "Kris", Move $ Coords 1.0 (-2.0)]
   }
 
-viewRadar :: Coords -> Coords -> ViewRadar
-viewRadar presentPosition radar =
-  ViewRadar
-  { viewRadarPosition = radar
-  , viewRadarDistance = distanceBetween presentPosition radar
+viewGps :: Coords -> Coords -> ViewGps
+viewGps presentPosition gps =
+  ViewGps
+  { viewGpsPosition = gps
+  , viewGpsDistance = distanceBetween presentPosition gps
   }

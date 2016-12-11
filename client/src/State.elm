@@ -75,9 +75,9 @@ decodeCoords =
         |> required "y" D.float
 
 
-decodeRadar : Decoder Radar
-decodeRadar =
-    decode Radar
+decodeGps : Decoder Gps
+decodeGps =
+    decode Gps
         |> required "distance" D.float
         |> required "position" decodeCoords
 
@@ -93,7 +93,7 @@ decodePlayer =
 decodeBoard : Decoder Board
 decodeBoard =
     decode Board
-        |> required "radars" (D.list decodeRadar)
+        |> required "gpss" (D.list decodeGps)
         |> required "players" (D.list decodePlayer)
 
 

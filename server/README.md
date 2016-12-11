@@ -47,6 +47,8 @@ User
 - [ ] Check win condition.
 - [ ] Respawn present.
 
+- [ ] Join & Leave aren't useful. Pub and sub would be.
+- [ ] Look command.
 - [ ] Move radars.
 - [ ] Make radars unreliable.
 - [ ] Pretty view.

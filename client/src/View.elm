@@ -29,7 +29,7 @@ root model =
 boardView : Board -> Html Msg
 boardView model =
     div []
-        [ radarList model.radars
+        [ gpsList model.gpss
         , playerList model.players
         ]
 
@@ -39,17 +39,17 @@ debuggingView datum =
     div [] [ code [] [ text <| toString datum ] ]
 
 
-radarList : List Radar -> Html msg
-radarList radars =
-    ul [] (List.map radarView radars)
+gpsList : List Gps -> Html msg
+gpsList gpss =
+    ul [] (List.map gpsView gpss)
 
 
-radarView : Radar -> Html msg
-radarView radar =
+gpsView : Gps -> Html msg
+gpsView gps =
     li []
-        [ text <| toString radar.position
+        [ text <| toString gps.position
         , text " "
-        , text <| toString radar.distance
+        , text <| toString gps.distance
         ]
 
 
@@ -101,5 +101,29 @@ controls =
             , onClick <| Move <| Coords -4.1 -1.2
             ]
             [ text "Move -4.1 -1.2 "
+            ]
+        , button
+            [ type_ "button"
+            , onClick <| Move <| Coords -1.0 0
+            ]
+            [ text "Left"
+            ]
+        , button
+            [ type_ "button"
+            , onClick <| Move <| Coords 0.0 -1.0
+            ]
+            [ text "Down"
+            ]
+        , button
+            [ type_ "button"
+            , onClick <| Move <| Coords 0.0 1.0
+            ]
+            [ text "Up"
+            ]
+        , button
+            [ type_ "button"
+            , onClick <| Move <| Coords 1.0 0
+            ]
+            [ text "Right"
             ]
         ]

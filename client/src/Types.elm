@@ -9,7 +9,7 @@ type alias Coords =
     }
 
 
-type alias Radar =
+type alias Gps =
     { distance : Float
     , position : Coords
     }
@@ -23,7 +23,7 @@ type alias Player =
 
 
 type alias Board =
-    { radars : List Radar
+    { gpss : List Gps
     , players : List Player
     }
 
