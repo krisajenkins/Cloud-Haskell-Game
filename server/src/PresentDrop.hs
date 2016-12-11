@@ -144,9 +144,23 @@ handleWin model =
     inRange player =
       distanceBetween (Lens.view present model) (Lens.view position player) < 0.5
 
+hypotenuse
+  :: Floating r
+  => r -> r -> r
+hypotenuse dx dy = sqrt $ (dx ^ (2 :: Int)) + (dy ^ (2 :: Int))
+
+normalise
+  :: (Floating r, Ord r)
+  => (r, r) -> (r, r)
+normalise (dx, dy) =
+  if h <= 1
+    then (dx, dy)
+    else (dx / h, dy / h)
+  where
+    h = hypotenuse dx dy
 
 distanceBetween :: Coords -> Coords -> Double
-distanceBetween a b = sqrt $ (dx ^ (2 :: Int)) + (dy ^ (2 :: Int))
+distanceBetween a b = hypotenuse dx dy
   where
     dx = Lens.view x a - Lens.view x b
     dy = Lens.view y a - Lens.view y b
@@ -163,8 +177,7 @@ handleMsg (playerId, Move moveTo) model =
   over (players . ix playerId . position) updatePosition model
   where
     updatePosition = over x (dx +) . over y (dy +)
-    dx = max (-1) . min 1 $ Lens.view x moveTo
-    dy = max (-1) . min 1 $ Lens.view y moveTo
+    (dx, dy) = normalise (Lens.view x moveTo, Lens.view y moveTo)
 
 view :: Model -> View
 view model =
