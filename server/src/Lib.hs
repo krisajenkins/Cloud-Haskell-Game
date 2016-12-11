@@ -7,7 +7,6 @@ module Lib where
 
 import           Control.Distributed.Process
 
---import           Control.Distributed.Process.Debug
 import           Control.Distributed.Process.Node
 import           Control.Distributed.Process.Serializable
 import qualified Control.Exception                        as Ex
@@ -21,6 +20,7 @@ import           Data.Binary
 import           Data.Foldable
 import           Data.Monoid
 import qualified Data.Set                                 as Set
+import           Data.Time
 import           GHC.Generics
 import           Network.Transport.InMemory
 import qualified Network.WebSockets                       as WS
@@ -108,26 +108,39 @@ receiveFromPlayerProcess
   -> Process ()
 receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
   liftIO $ putStrLn "P: LISTENING"
-  handle
+  handle Nothing
   where
-    handle = do
+    handle :: Maybe UTCTime -> Process ()
+    handle lastMessageHandled = do
       raw :: Either WS.ConnectionException WS.DataMessage <-
         liftIO . Ex.try $ WS.receiveDataMessage connection
       case raw of
         Left ex -> do
           liftIO . putStrLn $ "P: Socket has closed. Unsubscribing: " <> show ex
           sendChan txSubscribe (Unsub sendToMe)
-        Right (WS.Binary _) -> handle
+        Right (WS.Binary _) -> handle lastMessageHandled
         Right (WS.Text text) -> do
           liftIO . putStrLn $ "P: HEARD: " <> show text
           case Aeson.eitherDecode text of
             Left err -> do
               liftIO . putStrLn $ "Couldn't understand: " <> show text
               liftIO . putStrLn $ "  Error was: " <> show err
-              handle
+              handle lastMessageHandled
             Right msg -> do
-              sendChan txGameMsg (sendPortId sendToMe, msg)
-              handle
+              now <- liftIO getCurrentTime
+              case lastMessageHandled of
+                Nothing -> do
+                  sendChan txGameMsg (sendPortId sendToMe, msg)
+                  handle (Just now)
+                Just t -> do
+                  if addUTCTime timeBetweenCommands t < now
+                    then do
+                      sendChan txGameMsg (sendPortId sendToMe, msg)
+                      handle (Just now)
+                    else handle lastMessageHandled
+
+timeBetweenCommands :: NominalDiffTime
+timeBetweenCommands = 0.1
 
 announceToPlayerProcess
   :: (Show view, Serializable view, ToJSON view)

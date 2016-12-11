@@ -24,6 +24,7 @@ library
                      , aeson-casing
                      , pcre-light
                      , binary
+                     , time
                      , bytestring
                      , distributed-process
                      , distributed-process-simplelocalnet
