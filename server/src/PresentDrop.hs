@@ -22,7 +22,8 @@ import           GHC.Generics
 import           System.Random
 import qualified Text.Regex.PCRE.Light       as Regex
 
-data CssColor = CssColor Text
+data CssColor =
+  CssColor Text
   deriving (Show, Eq, Binary, Generic, FromJSON)
 
 mkCssColor :: Text -> Maybe CssColor
@@ -85,7 +86,7 @@ instance ToJSON View where
 instance ToJSON ViewGps where
   toJSON = genericToJSON $ aesonDrop 7 camelCase
 
-init :: StdGen ->  Model
+init :: StdGen -> Model
 init stdGen =
   Model
   { _players = Map.empty
@@ -121,7 +122,6 @@ randomPair range stdGen = ((a, b), stdGen'')
   where
     (a, stdGen') = randomR range stdGen
     (b, stdGen'') = randomR range stdGen'
-
 
 handleWin :: Model -> Model
 handleWin model =
@@ -185,12 +185,7 @@ view model =
   { viewPlayers = toListOf (players . traverse) model
   , viewGpss = viewGps (Lens.view present model) <$> Lens.view gpss model
   , viewSampleCommands =
-    [ Join
-    , Leave
-    , SetName "Kris"
-    , Move $ Coords 1.0 (-2.0)
-    , SetColor "#ff0000"
-    ]
+    [Join, Leave, SetName "Kris", Move $ Coords 1.0 (-2.0), SetColor "#ff0000"]
   }
 
 viewGps :: Coords -> Coords -> ViewGps
