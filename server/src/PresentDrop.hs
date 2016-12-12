@@ -47,9 +47,14 @@ data Player = Player
   , _color    :: Maybe CssColor
   } deriving (Show, Eq, Binary, Generic)
 
+data Gps = Gps
+  { _gpsPosition :: Coords
+  , _variance    :: Double
+  } deriving (Show, Eq, Binary, Generic)
+
 data Model = Model
   { _players :: Map SendPortId Player
-  , _gpss    :: [Coords]
+  , _gpss    :: [Gps]
   , _present :: Coords
   , _rng     :: StdGen
   } deriving (Show)
@@ -57,6 +62,8 @@ data Model = Model
 makeLenses ''Coords
 
 makeLenses ''Player
+
+makeLenses ''Gps
 
 makeLenses ''Model
 
@@ -90,7 +97,20 @@ init :: StdGen -> Model
 init stdGen =
   Model
   { _players = Map.empty
-  , _gpss = [Coords (-10) (-8), Coords 3 (-5), Coords 9 3]
+  , _gpss =
+    [ Gps
+      { _gpsPosition = Coords (-10) (-8)
+      , _variance = 0
+      }
+    , Gps
+      { _gpsPosition = Coords 3 (-5)
+      , _variance = 0
+      }
+    , Gps
+      { _gpsPosition = Coords 9 3
+      , _variance = 0
+      }
+    ]
   , _present = Coords 5 3
   , _rng = stdGen
   }
@@ -188,9 +208,11 @@ view model =
     [Join, Leave, SetName "Kris", Move $ Coords 1.0 (-2.0), SetColor "#ff0000"]
   }
 
-viewGps :: Coords -> Coords -> ViewGps
+viewGps :: Coords -> Gps -> ViewGps
 viewGps presentPosition gps =
   ViewGps
-  { viewGpsPosition = gps
-  , viewGpsDistance = distanceBetween presentPosition gps
+  { viewGpsPosition = Lens.view gpsPosition gps
+  , viewGpsDistance =
+    distanceBetween presentPosition (Lens.view gpsPosition gps) +
+    (Lens.view variance gps)
   }
