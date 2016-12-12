@@ -142,7 +142,7 @@ handleWin model =
     overlappingPlayers = Map.filter inRange (Lens.view players model)
     inRange :: Player -> Bool
     inRange player =
-      distanceBetween (Lens.view present model) (Lens.view position player) < 0.5
+      distanceBetween (Lens.view present model) (Lens.view position player) < 1
 
 hypotenuse
   :: Floating r
