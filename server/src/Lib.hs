@@ -13,7 +13,6 @@ import           Network.Wai.Handler.WebSockets
 import           Control.Distributed.Process.Node
 import           Control.Distributed.Process.Serializable
 import qualified Control.Exception                        as Ex
-import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Loops
 import           Control.Monad.Trans.Resource
@@ -96,22 +95,29 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
       (\_ -> putStrLn "P: Leaves")
   liftIO . runProcess node $
     do (sendToMe, receiveFromBroadcaster) <- newChan
+       let disconnectHandler :: WS.ConnectionException -> Process ()
+           disconnectHandler ex = do
+             liftIO . putStrLn $
+               "P: Socket has closed. Unsubscribing: " <> show ex
+             sendChan txSubscribe (Unsub sendToMe)
        _ <-
-         spawnLocal $ receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection
+         spawnLocal $
+         receiveFromPlayerProcess sendToMe txGameMsg disconnectHandler connection
        sendChan txSubscribe (Sub sendToMe)
-       announceToPlayerProcess connection receiveFromBroadcaster
+       announceToPlayerProcess connection receiveFromBroadcaster disconnectHandler
 
 ------------------------------------------------------------
 -- Player
 ------------------------------------------------------------
 receiveFromPlayerProcess
   :: (Serializable view, Show view, Serializable msg, Show msg, FromJSON msg)
-  => SendPort (PubSubMsg view)
-  -> SendPort view
+  =>
+   SendPort view
   -> SendPort (SendPortId, msg)
+  -> (WS.ConnectionException -> Process ())
   -> WS.Connection
   -> Process ()
-receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
+receiveFromPlayerProcess sendToMe txGameMsg disconnectHandler connection = do
   liftIO $ putStrLn "P: LISTENING"
   handle Nothing
   where
@@ -120,9 +126,7 @@ receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
       raw :: Either WS.ConnectionException WS.DataMessage <-
         liftIO . Ex.try $ WS.receiveDataMessage connection
       case raw of
-        Left ex -> do
-          liftIO . putStrLn $ "P: Socket has closed. Unsubscribing: " <> show ex
-          sendChan txSubscribe (Unsub sendToMe)
+        Left ex -> disconnectHandler ex
         Right (WS.Binary _) -> handle lastMessageHandled
         Right (WS.Text text) -> do
           liftIO . putStrLn $ "P: HEARD: " <> show text
@@ -149,11 +153,19 @@ timeBetweenCommands = 0.1
 
 announceToPlayerProcess
   :: (Show view, Serializable view, ToJSON view)
-  => WS.Connection -> ReceivePort view -> Process ()
-announceToPlayerProcess connection rx =
-  forever $
-  do msg <- receiveChan rx
-     liftIO . WS.sendTextData connection $ Aeson.encode msg
+  => WS.Connection
+  -> ReceivePort view
+  -> (WS.ConnectionException -> Process ())
+  -> Process ()
+announceToPlayerProcess connection rx disconnectHandler = handle
+  where
+    handle = do
+      msg <- receiveChan rx
+      sent :: Either WS.ConnectionException () <-
+        liftIO . Ex.try . WS.sendTextData connection $ Aeson.encode msg
+      case sent of
+        Right _ -> handle
+        Left ex -> disconnectHandler ex
 
 ------------------------------------------------------------
 -- Broadcaster
