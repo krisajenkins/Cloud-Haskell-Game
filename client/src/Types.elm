@@ -19,6 +19,7 @@ type alias Player =
     { name : String
     , score : Int
     , position : Coords
+    , color : Maybe String
     }
 
 

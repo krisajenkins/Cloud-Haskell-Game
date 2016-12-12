@@ -99,6 +99,7 @@ decodePlayer =
         |> required "name" D.string
         |> required "score" D.int
         |> required "position" decodeCoords
+        |> required "color" (D.maybe D.string)
 
 
 decodeBoard : Decoder Board
