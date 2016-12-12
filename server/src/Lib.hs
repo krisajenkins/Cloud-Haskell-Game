@@ -6,6 +6,9 @@
 module Lib where
 
 import           Control.Distributed.Process
+import           Network.Wai.Application.Static
+import qualified Network.Wai.Handler.Warp                 as Warp
+import           Network.Wai.Handler.WebSockets
 
 import           Control.Distributed.Process.Node
 import           Control.Distributed.Process.Serializable
@@ -48,8 +51,7 @@ runGame
      ,ToJSON view)
   => ((SendPortId, msg) -> state -> state) -> (state -> view) -> state -> IO ()
 runGame update view initialGameState =
-  let host = "0.0.0.0"
-      websocketPort = 9000
+  let websocketPort = 9000
   in runStdoutLoggingT $
      do logInfoN "START"
         logInfoN "Booting Cloud Haskell"
@@ -65,8 +67,11 @@ runGame update view initialGameState =
              _ <- spawnLocal $ broadcastProcess rxGameState receiveSubGameState
              _ <-
                spawnLocal $ gameProcess receiveGameMsg txGameState update view initialGameState
-             liftIO . WS.runServer host websocketPort $
-               runResourceT . acceptClientConnection node sendGameMsg sendSubGameState
+             liftIO . Warp.run websocketPort $
+               websocketsOr
+                 WS.defaultConnectionOptions
+                 (runResourceT . acceptClientConnection node sendGameMsg sendSubGameState)
+                 (staticApp $ defaultFileServerSettings "../client/dist")
         logInfoN "END"
 
 acceptClientConnection

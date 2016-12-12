@@ -25,6 +25,7 @@ library
                      , pcre-light
                      , binary
                      , time
+                     , wai-app-static
                      , bytestring
                      , distributed-process
                      , distributed-process-simplelocalnet
