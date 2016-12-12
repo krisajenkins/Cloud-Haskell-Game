@@ -18,6 +18,7 @@ import           Data.Map.Strict             (Map)
 import qualified Data.Map.Strict             as Map
 import           Data.Text                   (Text)
 import           GHC.Generics
+import           Lib                         (EngineMsg (..))
 import           System.Random
 
 data Coords = Coords
@@ -107,14 +108,12 @@ newPlayer =
   }
 
 data Msg
-  = Join
-  | Leave
-  | SetName Text
+  = SetName Text
   | SetColor Text
   | Move Coords
   deriving (Show, Eq, Binary, Generic, FromJSON, ToJSON)
 
-update :: (SendPortId, Msg) -> Model -> Model
+update :: (SendPortId, EngineMsg Msg) -> Model -> Model
 update msg = handleWin . handleMsg msg
 
 randomPair
@@ -146,6 +145,9 @@ handleWin model =
     inRange player =
       distanceBetween (Lens.view present model) (Lens.view position player) < 1
 
+-- withRandomisedGpsVariance :: Model -> Model
+-- withRandomisedGpsVariance = _
+
 hypotenuse
   :: Floating r
   => r -> r -> r
@@ -167,15 +169,15 @@ distanceBetween a b = hypotenuse dx dy
     dx = Lens.view x a - Lens.view x b
     dy = Lens.view y a - Lens.view y b
 
-handleMsg :: (SendPortId, Msg) -> Model -> Model
+handleMsg :: (SendPortId, EngineMsg Msg) -> Model -> Model
 handleMsg (playerId, Join) model =
   set (players . at playerId) (Just newPlayer) model
 handleMsg (playerId, Leave) model = set (players . at playerId) Nothing model
-handleMsg (playerId, SetName newName) model =
+handleMsg (playerId, GameMsg (SetName newName)) model =
   set (players . ix playerId . name) newName model
-handleMsg (playerId, SetColor text) model =
+handleMsg (playerId, GameMsg (SetColor text)) model =
   set (players . ix playerId . color) (Just text) model
-handleMsg (playerId, Move moveTo) model =
+handleMsg (playerId, GameMsg (Move moveTo)) model =
   over (players . ix playerId . position) updatePosition model
   where
     updatePosition = over x (dx +) . over y (dy +)
@@ -187,7 +189,7 @@ view model =
   { viewPlayers = toListOf (players . traverse) model
   , viewGpss = viewGps (Lens.view present model) <$> Lens.view gpss model
   , viewSampleCommands =
-    [Join, Leave, SetName "Kris", Move $ Coords 1.0 (-2.0), SetColor "#ff0000"]
+    [SetName "Kris", Move $ Coords 1.0 (-2.0), SetColor "#ff0000"]
   }
 
 viewGps :: Coords -> Gps -> ViewGps

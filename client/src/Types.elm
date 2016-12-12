@@ -32,8 +32,6 @@ type alias Board =
 type Msg
     = SetName String
     | SetColor String
-    | Join
-    | Leave
     | Move Coords
     | Receive (RemoteData String Board)
 

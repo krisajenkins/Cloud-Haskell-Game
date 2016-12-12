@@ -23,18 +23,6 @@ init =
 update : Msg -> Model -> Response Model Msg
 update msg model =
     case msg of
-        Join ->
-            ( model
-            , WebSocket.send websocketEndpoint
-                (E.object [ ( "tag", E.string "Join" ), ( "contents", E.list [] ) ] |> E.encode 0)
-            )
-
-        Leave ->
-            ( model
-            , WebSocket.send websocketEndpoint
-                (E.object [ ( "tag", E.string "Leave" ), ( "contents", E.list [] ) ] |> E.encode 0)
-            )
-
         SetName string ->
             ( model
             , WebSocket.send websocketEndpoint

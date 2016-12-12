@@ -46,10 +46,7 @@ heading : Html Msg
 heading =
     div [ style [ ( "text-align", "center" ) ] ]
         [ h1 [] [ text "Santa's Present Drop" ]
-        , div [ style [ ( "margin", "10px 0" ) ] ]
-            [ code []
-                [ text "{'tag':'Join','contents':[]}" ]
-            ]
+        , h3 [] [ text "http://game.clearercode.com" ]
         , controls
         ]
 
@@ -145,20 +142,6 @@ controls =
         , style [ ( "margin", "0 auto" ) ]
         ]
         [ button
-            [ type_ "button"
-            , class "btn btn-default btn-sm"
-            , onClick Join
-            ]
-            [ text "Join"
-            ]
-        , button
-            [ type_ "button"
-            , class "btn btn-default btn-sm"
-            , onClick Leave
-            ]
-            [ text "Leave"
-            ]
-        , button
             [ type_ "button"
             , class "btn btn-default btn-sm"
             , onClick (SetName "Kris")

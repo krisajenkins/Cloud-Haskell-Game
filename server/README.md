@@ -51,13 +51,15 @@ User
 - [X] Set color.
 - [X] Normalize move distance.
 
-- [ ] Deploy
-- [ ] Send board on connect.
-- [ ] Visualise
+- [X] Deploy
+- [X] Send board on connect.
+- [X] Visualise
+- [ ] More than one present.
 
-- [ ] Join & Leave aren't useful. Pub and sub would be.
-- [ ] Leave on disconnect.
-- [ ] Join on connect. Send board.
+- [X] Join & Leave aren't useful.
+- [ ] Pub and sub would be useful.
+- [X] Leave on disconnect.
+- [X] Join on connect. Send board.
 - [ ] Look command. (Broadcaster could hold the last-seen state.)
 
 - [ ] Make one radar unreliable.
