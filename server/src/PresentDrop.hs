@@ -90,7 +90,7 @@ init :: StdGen -> Model
 init stdGen =
   Model
   { _players = Map.empty
-  , _gpss = [Coords (-10) (-15), Coords 3 (-5), Coords 12 3]
+  , _gpss = [Coords (-10) (-8), Coords 3 (-5), Coords 9 3]
   , _present = Coords 5 3
   , _rng = stdGen
   }
