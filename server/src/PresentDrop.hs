@@ -189,7 +189,7 @@ view model =
   { viewPlayers = toListOf (players . traverse) model
   , viewGpss = viewGps (Lens.view present model) <$> Lens.view gpss model
   , viewSampleCommands =
-    [SetName "Kris", Move $ Coords 1.0 (-2.0), SetColor "#ff0000"]
+    [SetName "Kris", SetColor "#ff0000", Move $ Coords 1.0 (-2.0)]
   }
 
 viewGps :: Coords -> Gps -> ViewGps
