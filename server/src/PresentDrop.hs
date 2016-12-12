@@ -17,23 +17,8 @@ import           Data.Binary
 import           Data.Map.Strict             (Map)
 import qualified Data.Map.Strict             as Map
 import           Data.Text                   (Text)
-import           Data.Text.Encoding
 import           GHC.Generics
 import           System.Random
-import qualified Text.Regex.PCRE.Light       as Regex
-
-data CssColor =
-  CssColor Text
-  deriving (Show, Eq, Binary, Generic, FromJSON)
-
-mkCssColor :: Text -> Maybe CssColor
-mkCssColor text =
-  case Regex.match cssColorRegex (encodeUtf8 text) [] of
-    Nothing -> Nothing
-    Just _ -> Just (CssColor text)
-  where
-    cssColorRegex :: Regex.Regex
-    cssColorRegex = Regex.compile "^#[0-9a-f]{6}$" [Regex.caseless]
 
 data Coords = Coords
   { _x :: Double
@@ -44,7 +29,7 @@ data Player = Player
   { _position :: Coords
   , _score    :: Integer
   , _name     :: Text
-  , _color    :: Maybe CssColor
+  , _color    :: Maybe Text
   } deriving (Show, Eq, Binary, Generic)
 
 data Gps = Gps
@@ -66,9 +51,6 @@ makeLenses ''Player
 makeLenses ''Gps
 
 makeLenses ''Model
-
-instance ToJSON CssColor where
-  toJSON = genericToJSON $ aesonDrop 1 camelCase
 
 instance ToJSON Coords where
   toJSON = genericToJSON $ aesonDrop 1 camelCase
@@ -192,7 +174,7 @@ handleMsg (playerId, Leave) model = set (players . at playerId) Nothing model
 handleMsg (playerId, SetName newName) model =
   set (players . ix playerId . name) newName model
 handleMsg (playerId, SetColor text) model =
-  set (players . ix playerId . color) (mkCssColor text) model
+  set (players . ix playerId . color) (Just text) model
 handleMsg (playerId, Move moveTo) model =
   over (players . ix playerId . position) updatePosition model
   where

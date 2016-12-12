@@ -22,7 +22,6 @@ library
                      , MonadRandom
                      , aeson
                      , aeson-casing
-                     , pcre-light
                      , binary
                      , time
                      , wai-app-static
