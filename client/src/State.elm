@@ -23,6 +23,9 @@ init =
 update : Msg -> Model -> Response Model Msg
 update msg model =
     case msg of
+        KeepAlive ->
+            ( model, Cmd.none )
+
         SetName string ->
             ( model
             , WebSocket.send websocketEndpoint
@@ -99,4 +102,8 @@ decodeBoard =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    WebSocket.listen websocketEndpoint (D.decodeString decodeBoard >> RemoteData.fromResult >> Receive)
+    Sub.batch
+        [ WebSocket.listen websocketEndpoint (D.decodeString decodeBoard >> RemoteData.fromResult >> Receive)
+        , WebSocket.keepAlive websocketEndpoint
+            |> Sub.map (always KeepAlive)
+        ]

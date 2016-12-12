@@ -34,6 +34,7 @@ type Msg
     | SetColor String
     | Move Coords
     | Receive (RemoteData String Board)
+    | KeepAlive
 
 
 type alias Model =
