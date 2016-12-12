@@ -121,6 +121,7 @@ playerView player =
                 [ ( "display", "inline-block" )
                 , ( "border", "solid 1px black" )
                 , ( "background-color", (Maybe.withDefault "white" player.color) )
+                , ( "transition", "all 1s" )
                 , ( "height", "15px" )
                 , ( "width", "15px" )
                 , ( "margin-right", "15px" )
