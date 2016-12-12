@@ -1,5 +1,6 @@
 module View.Scene exposing (root)
 
+import Formatting as F exposing ((<>))
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Types exposing (..)
@@ -49,9 +50,24 @@ gpsView gps =
             , r <| toString gps.distance
             , opacity "0.6"
             , stroke "#0697e8"
-            , strokeWidth "0.5"
+            , strokeDasharray "1"
+            , strokeWidth "0.2"
             , fill "none"
             , Svg.Attributes.style "transition: all 1s"
             ]
-            []
+            [ let
+                formatRotation =
+                    F.float <> F.s " " <> F.float <> F.s " " <> F.float
+              in
+                animateTransform
+                    [ attributeName "transform"
+                    , attributeType "XML"
+                    , type_ "rotate"
+                    , from <| F.print formatRotation 0 gps.position.x gps.position.y
+                    , to <| F.print formatRotation 360 gps.position.x gps.position.y
+                    , dur "10s"
+                    , repeatCount "indefinite"
+                    ]
+                    []
+            ]
         ]

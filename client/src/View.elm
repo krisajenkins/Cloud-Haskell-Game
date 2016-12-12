@@ -21,7 +21,7 @@ root model =
             ]
         ]
         [ bootstrap.css
-        , controls
+        , heading
         , remoteDataView boardView model
         ]
 
@@ -40,6 +40,18 @@ remoteDataView view remoteData =
 
         Success data ->
             view data
+
+
+heading : Html Msg
+heading =
+    div [ style [ ( "text-align", "center" ) ] ]
+        [ h1 [] [ text "Santa's Present Drop" ]
+        , div [ style [ ( "margin", "10px 0" ) ] ]
+            [ code []
+                [ text "{'tag':'Join','contents':[]}" ]
+            ]
+        , controls
+        ]
 
 
 boardView : Board -> Html Msg
@@ -149,20 +161,6 @@ controls =
             , onClick (SetColor "#0000ff")
             ]
             [ text "Set Color"
-            ]
-        , button
-            [ type_ "button"
-            , class "btn btn-default btn-sm"
-            , onClick <| Move <| Coords 1.2 4.1
-            ]
-            [ text "Move 1.2 4.1"
-            ]
-        , button
-            [ type_ "button"
-            , class "btn btn-default btn-sm"
-            , onClick <| Move <| Coords -4.1 -1.2
-            ]
-            [ text "Move -4.1 -1.2 "
             ]
         , button
             [ type_ "button"
