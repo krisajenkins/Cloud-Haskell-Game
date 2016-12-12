@@ -214,5 +214,5 @@ viewGps presentPosition gps =
   { viewGpsPosition = Lens.view gpsPosition gps
   , viewGpsDistance =
     distanceBetween presentPosition (Lens.view gpsPosition gps) +
-    (Lens.view variance gps)
+    Lens.view variance gps
   }

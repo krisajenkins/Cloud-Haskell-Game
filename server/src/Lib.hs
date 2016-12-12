@@ -132,7 +132,7 @@ receiveFromPlayerProcess txSubscribe sendToMe txGameMsg connection = do
                 Nothing -> do
                   sendChan txGameMsg (sendPortId sendToMe, msg)
                   handle (Just now)
-                Just t -> do
+                Just t ->
                   if addUTCTime timeBetweenCommands t < now
                     then do
                       sendChan txGameMsg (sendPortId sendToMe, msg)
