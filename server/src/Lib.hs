@@ -91,7 +91,7 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
   (_releaseKey, connection) <-
     allocate
       (runStdoutLoggingT $
-       do liftIO . putStrLn $ "P: New connection received."
+       do logInfoN "P: New connection received."
           liftIO $ WS.acceptRequest pendingConnection)
       (\_ -> putStrLn "P: Leaves")
   liftIO . runProcess node $
@@ -153,7 +153,7 @@ announceToPlayerProcess
 announceToPlayerProcess connection rx =
   forever $
   do msg <- receiveChan rx
-     liftIO $ WS.sendTextData connection (Aeson.encode msg)
+     liftIO . WS.sendTextData connection $ Aeson.encode msg
 
 ------------------------------------------------------------
 -- Broadcaster
