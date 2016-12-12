@@ -24,7 +24,7 @@ import           System.Random
 data Coords = Coords
   { _x :: Double
   , _y :: Double
-  } deriving (Show, Eq, Binary, Generic, FromJSON)
+  } deriving (Show, Eq, Binary, Generic)
 
 data Player = Player
   { _position :: Coords
@@ -52,6 +52,9 @@ makeLenses ''Player
 makeLenses ''Gps
 
 makeLenses ''Model
+
+instance FromJSON Coords where
+  parseJSON = genericParseJSON $ aesonDrop 1 camelCase
 
 instance ToJSON Coords where
   toJSON = genericToJSON $ aesonDrop 1 camelCase

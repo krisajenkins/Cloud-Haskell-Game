@@ -55,8 +55,8 @@ update msg model =
                     [ ( "tag", E.string "Move" )
                     , ( "contents"
                       , E.object
-                            [ ( "_x", E.float to.x )
-                            , ( "_y", E.float to.y )
+                            [ ( "x", E.float to.x )
+                            , ( "y", E.float to.y )
                             ]
                       )
                     ]
