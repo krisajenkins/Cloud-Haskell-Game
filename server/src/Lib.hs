@@ -192,7 +192,6 @@ gameProcess rxGameMsg txGameState updateFn viewFn = iterateM_ handle
     handle game = do
       (replyTo, msg) <- receiveChan rxGameMsg
       liftIO . putStrLn $ "G: Heard: " <> show msg
-      liftIO . putStrLn $ "G: Game: " <> show game
       let newGame = updateFn (replyTo, msg) game
       sendChan txGameState (viewFn newGame)
       return newGame
