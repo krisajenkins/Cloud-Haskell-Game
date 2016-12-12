@@ -103,11 +103,11 @@ init stdGen =
       , _variance = 0
       }
     , Gps
-      { _gpsPosition = Coords 3 (-5)
+      { _gpsPosition = Coords 12 (-5)
       , _variance = 0
       }
     , Gps
-      { _gpsPosition = Coords 9 3
+      { _gpsPosition = Coords (-4) 9
       , _variance = 0
       }
     ]
