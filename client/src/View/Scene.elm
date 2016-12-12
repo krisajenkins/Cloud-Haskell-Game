@@ -10,7 +10,7 @@ root : Board -> Svg msg
 root board =
     svg
         [ width "70vw"
-        , height "70vw"
+        , height "70vh"
         , viewBox "-30 -30 60 60"
         ]
         [ g [] (List.map playerView board.players)
