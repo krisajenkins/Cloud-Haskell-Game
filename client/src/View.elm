@@ -68,7 +68,12 @@ boardView board =
                 ]
             ]
             [ View.Scene.root board ]
-        , div [ style [ ( "padding", "15px" ) ] ]
+        , div
+            [ style
+                [ ( "padding", "15px" )
+                , ( "flex-grow", "1" )
+                ]
+            ]
             [ playerList board.players ]
         ]
 
@@ -122,9 +127,13 @@ playerView player =
                 ]
             ]
             [ text nbsp ]
-        , F.html (F.s "(" <> F.int <> F.s ") " <> F.string)
-            player.score
-            player.name
+        , div [ style [ ( "flex-grow", "1" ) ] ]
+            [ F.html (F.s "(" <> F.int <> F.s ") " <> F.string)
+                player.score
+                player.name
+            ]
+        , div [ class "badge" ]
+            [ text <| toString player.score ]
         ]
 
 
