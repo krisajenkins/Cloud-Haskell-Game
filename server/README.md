@@ -54,17 +54,16 @@ User
 - [X] Deploy
 - [X] Send board on connect.
 - [X] Visualise
-- [ ] More than one present.
 
 - [X] Join & Leave aren't useful.
-- [ ] Pub and sub would be useful.
 - [X] Leave on disconnect.
 - [X] Join on connect. Send board.
-- [ ] Look command. (Broadcaster could hold the last-seen state.)
-
-- [ ] Make one radar unreliable.
 
 - [X] Include radars in view.
+- [X] All the channel/process names are horrible.
+- [X] Refactor.
+
+- [ ] Pub, sub and look commands would be useful.
+- [ ] More than one present.
+- [ ] Make one radar unreliable.
 - [ ] Could really do with some proper monitoring.
-- [ ] All the channel/process names are horrible.
-- [ ] Refactor.
