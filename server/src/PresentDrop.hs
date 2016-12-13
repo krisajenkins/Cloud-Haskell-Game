@@ -180,9 +180,12 @@ movePresent model = set rng newRng $ set present (Coords newX newY) model
 handleMsg :: (SendPortId, EngineMsg Msg) -> Model -> Model
 handleMsg (playerId, Join) = set (players . at playerId) (Just newPlayer)
 handleMsg (playerId, Leave) = set (players . at playerId) Nothing
-handleMsg (playerId, GameMsg (SetName newName)) = set (players . ix playerId . name) newName
-handleMsg (playerId, GameMsg (SetColor text)) = set (players . ix playerId . color) text
-handleMsg (playerId, GameMsg (Move moveTo)) = over (players . ix playerId . position) updatePosition
+handleMsg (playerId, GameMsg (SetName newName)) =
+  set (players . ix playerId . name) newName
+handleMsg (playerId, GameMsg (SetColor text)) =
+  set (players . ix playerId . color) text
+handleMsg (playerId, GameMsg (Move moveTo)) =
+  over (players . ix playerId . position) updatePosition
   where
     updatePosition = over x (dx +) . over y (dy +)
     (dx, dy) = normalise (Lens.view x moveTo, Lens.view y moveTo)
