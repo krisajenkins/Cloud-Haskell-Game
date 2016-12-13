@@ -60,7 +60,7 @@ runGame update view initialGameState =
   let websocketPort = 8000
   in runStdoutLoggingT $
      do logInfoN "START"
-        logInfoN $ "Booting Cloud Haskell"
+        logInfoN "Booting Cloud Haskell"
         backend <- liftIO createTransport
         node <- liftIO $ newLocalNode backend initRemoteTable
         logInfoN $ "Starting listener on port: " <> T.pack (show websocketPort)
