@@ -34,7 +34,7 @@ data Player = Player
   { _position :: Coords
   , _score    :: Integer
   , _name     :: Text
-  , _color    :: Maybe Text
+  , _color    :: Text
   } deriving (Show, Eq, Binary, Generic)
 
 data Gps = Gps
@@ -142,7 +142,7 @@ newPlayer =
   { _name = "<Your Name Here>"
   , _score = 0
   , _position = Coords 0 0
-  , _color = Nothing
+  , _color = "white"
   }
 
 data Msg
@@ -179,7 +179,7 @@ handleMsg :: (SendPortId, EngineMsg Msg) -> Model -> Model
 handleMsg (playerId, Join) = set (players . at playerId) (Just newPlayer)
 handleMsg (playerId, Leave) = set (players . at playerId) Nothing
 handleMsg (playerId, GameMsg (SetName newName)) = set (players . ix playerId . name) newName
-handleMsg (playerId, GameMsg (SetColor text)) = set (players . ix playerId . color) (Just text)
+handleMsg (playerId, GameMsg (SetColor text)) = set (players . ix playerId . color) text
 handleMsg (playerId, GameMsg (Move moveTo)) = over (players . ix playerId . position) updatePosition
   where
     updatePosition = over x (dx +) . over y (dy +)
