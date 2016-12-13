@@ -148,9 +148,6 @@ handleWin model =
     inRange player =
       distanceBetween (Lens.view present model) (Lens.view position player) < 1
 
--- withRandomisedGpsVariance :: Model -> Model
--- withRandomisedGpsVariance = _
-
 hypotenuse
   :: Floating r
   => r -> r -> r
