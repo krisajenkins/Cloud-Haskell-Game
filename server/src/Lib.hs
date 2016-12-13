@@ -69,7 +69,7 @@ runGame update view initialGameState =
           do (txSubscription, rxSubscription) <- newChan
              (txGameView, rxGameView) <- newChan
              (txGameMsg, rxGameMsg) <- newChan
-             _ <- spawnLocal $ broadcastProcess rxGameView rxSubscription
+             _ <- spawnLocal $ broadcaster rxGameView rxSubscription
              _ <- spawnLocal $ gameProcess rxGameMsg txGameView update view initialGameState
              liftIO . Warp.run websocketPort $
                websocketsOr
@@ -108,23 +108,23 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
              sendChan txGameMsg (sendPortId txToPlayer, Leave)
        _ <-
          spawnLocal $
-         receiveFromPlayerProcess txToPlayer txGameMsg disconnectHandler connection
+         receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
        sendChan txSubscribe (Sub txToPlayer)
        sendChan txGameMsg (sendPortId txToPlayer, Join)
-       announceToPlayerProcess connection rxFromBroadcaster disconnectHandler
+       announceToPlayer connection rxFromBroadcaster disconnectHandler
 
 ------------------------------------------------------------
 -- Player
 ------------------------------------------------------------
 -- TODO This process could do with some refactoring.
-receiveFromPlayerProcess
+receiveFromPlayer
   :: (Serializable view, Show view, Serializable msg, Show msg, FromJSON msg)
   => SendPort view
   -> SendPort (SendPortId, EngineMsg msg)
   -> (WS.ConnectionException -> Process ())
   -> WS.Connection
   -> Process ()
-receiveFromPlayerProcess txToPlayer txGameMsg disconnectHandler connection = do
+receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection = do
   liftIO $ putStrLn "P: LISTENING"
   handle Nothing
   where
@@ -154,13 +154,13 @@ receiveFromPlayerProcess txToPlayer txGameMsg disconnectHandler connection = do
                       handle (Just now)
                     else handle lastMessageHandled
 
-announceToPlayerProcess
+announceToPlayer
   :: (Show view, Serializable view, ToJSON view)
   => WS.Connection
   -> ReceivePort view
   -> (WS.ConnectionException -> Process ())
   -> Process ()
-announceToPlayerProcess connection rx disconnectHandler = handle
+announceToPlayer connection rx disconnectHandler = handle
   where
     handle = do
       msg <- receiveChan rx
@@ -172,10 +172,10 @@ announceToPlayerProcess connection rx disconnectHandler = handle
 ------------------------------------------------------------
 -- Broadcaster
 ------------------------------------------------------------
-broadcastProcess
+broadcaster
   :: (Show view, Serializable view)
   => ReceivePort view -> ReceivePort (PubSubMsg view) -> Process ()
-broadcastProcess inboundGame subscriptionRequests = iterateM_ handle Set.empty
+broadcaster inboundGame subscriptionRequests = iterateM_ handle Set.empty
   where
     handle subscribers = do
       liftIO . putStrLn $ "B: Subscribers: " <> show subscribers
