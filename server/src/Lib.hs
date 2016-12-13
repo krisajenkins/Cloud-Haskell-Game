@@ -47,11 +47,11 @@ timeBetweenCommands = 0.1
 runGame
   :: (Serializable msg
      ,Serializable view
+     ,FromJSON msg
+     ,ToJSON view
      ,Show view
      ,Show state
-     ,FromJSON msg
-     ,Show msg
-     ,ToJSON view)
+     ,Show msg)
   => ((SendPortId, EngineMsg msg) -> state -> state)
   -> (state -> view)
   -> state
@@ -80,12 +80,12 @@ runGame update view initialGameState =
 
 acceptClientConnection
   :: (MonadResource m
-     ,Serializable view
-     ,Show view
-     ,ToJSON view
      ,Serializable msg
-     ,Show msg
-     ,FromJSON msg)
+     ,Serializable view
+     ,FromJSON msg
+     ,ToJSON view
+     ,Show view
+     ,Show msg)
   => LocalNode
   -> SendPort (SendPortId, EngineMsg msg)
   -> SendPort (PubSubMsg view)
@@ -118,7 +118,7 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
 ------------------------------------------------------------
 -- TODO This process could do with some refactoring.
 receiveFromPlayer
-  :: (Serializable view, Show view, Serializable msg, Show msg, FromJSON msg)
+  :: (Serializable msg, Serializable view, Show msg, Show view, FromJSON msg)
   => SendPort view
   -> SendPort (SendPortId, EngineMsg msg)
   -> (WS.ConnectionException -> Process ())
@@ -199,7 +199,7 @@ broadcaster inboundGame subscriptionRequests = iterateM_ handle Set.empty
 -- Game
 ------------------------------------------------------------
 gameProcess
-  :: (Show msg, Serializable msg, Serializable view, Show state)
+  :: (Serializable msg, Serializable view, Show msg, Show state)
   => ReceivePort (SendPortId, msg)
   -> SendPort view
   -> ((SendPortId, msg) -> state -> state)
