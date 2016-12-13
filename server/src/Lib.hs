@@ -180,20 +180,20 @@ broadcaster inboundGame subscriptionRequests = iterateM_ handle Set.empty
     handle subscribers = do
       liftIO . putStrLn $ "B: Subscribers: " <> show subscribers
       mergedPorts <-
-        mergePortsBiased [Left <$> inboundGame, Right <$> subscriptionRequests]
+        mergePortsBiased [Left <$> subscriptionRequests, Right <$> inboundGame]
       msg <- receiveChan mergedPorts
       case msg of
-        Left state -> do
+        Left (Sub subscriber) -> do
+          liftIO . putStrLn $ "B: adding: " <> show subscriber
+          return (Set.insert subscriber subscribers)
+        Left (Unsub subscriber) -> do
+          liftIO . putStrLn $ "B: removing: " <> show subscriber
+          return (Set.delete subscriber subscribers)
+        Right state -> do
           liftIO . putStrLn $
             "B: Broadcasting: " <> show state <> " to: " <> show subscribers
           traverse_ (`sendChan` state) $ Set.toList subscribers
           return subscribers
-        Right (Sub subscriber) -> do
-          liftIO . putStrLn $ "B: adding: " <> show subscriber
-          return (Set.insert subscriber subscribers)
-        Right (Unsub subscriber) -> do
-          liftIO . putStrLn $ "B: removing: " <> show subscriber
-          return (Set.delete subscriber subscribers)
 
 ------------------------------------------------------------
 -- Game
