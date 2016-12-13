@@ -9,7 +9,7 @@ Break out your websockets library and your finest trigonometry,
 connect to the server and triangulate the position of the present
 before anyone else does!
 
-![Game Screenshot](actionshot.png?raw=true "Screenshot")
+![Game Screenshot](action-shot.png?raw=true "Screenshot")
 
 # Building
 
