@@ -2,8 +2,8 @@
 
 Santa has given up with chimneys and is just dropping presents from
 the sky. Its your job to run through the city picking them up. But
-there's a catch - you can't see the present. All you know is its
-distance from three GPS base-stations.
+there's a catch - you don't know where the present is! All we can tell
+you is its distance from three GPS base-stations.
 
 Break out your websockets library and your finest trigonometry,
 connect to the server and triangulate the position of the present
@@ -28,7 +28,7 @@ stack build
 stack exec cloud-haskell-game
 ```
 
-...and navigate to http://localhost:9000.
+...and navigate to http://localhost:8000/.
 
 
 ## Developing
