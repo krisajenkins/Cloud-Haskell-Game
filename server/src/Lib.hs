@@ -37,6 +37,9 @@ data PubSubMsg view
   | Unsub (SendPort view)
   deriving (Show, Eq, Binary, Generic)
 
+timeBetweenCommands :: NominalDiffTime
+timeBetweenCommands = 0.1
+
 ------------------------------------------------------------
 -- Websocket Server & Wiring.
 ------------------------------------------------------------
@@ -63,16 +66,16 @@ runGame update view initialGameState =
         logInfoN "Forking listener."
         _ <-
           liftIO . runProcess node $
-          do (sendSubGameState, receiveSubGameState) <- newChan
-             (txGameState, rxGameState) <- newChan
-             (sendGameMsg, receiveGameMsg) <- newChan
-             _ <- spawnLocal $ broadcastProcess rxGameState receiveSubGameState
+          do (txSubscription, rxSubscription) <- newChan
+             (txGameView, rxGameView) <- newChan
+             (txGameMsg, rxGameMsg) <- newChan
+             _ <- spawnLocal $ broadcastProcess rxGameView rxSubscription
              _ <-
-               spawnLocal $ gameProcess receiveGameMsg txGameState update view initialGameState
+               spawnLocal $ gameProcess rxGameMsg txGameView update view initialGameState
              liftIO . Warp.run websocketPort $
                websocketsOr
                  WS.defaultConnectionOptions
-                 (runResourceT . acceptClientConnection node sendGameMsg sendSubGameState)
+                 (runResourceT . acceptClientConnection node txGameMsg txSubscription)
                  (staticApp $ defaultFileServerSettings "../client/dist")
         logInfoN "END"
 
@@ -97,19 +100,19 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
           liftIO $ WS.acceptRequest pendingConnection)
       (\_ -> putStrLn "P: Leaves")
   liftIO . runProcess node $
-    do (sendToMe, receiveFromBroadcaster) <- newChan
+    do (txToPlayer, rxFromBroadcaster) <- newChan
        let disconnectHandler :: WS.ConnectionException -> Process ()
            disconnectHandler ex = do
              liftIO . putStrLn $
                "P: Socket has closed. Unsubscribing: " <> show ex
-             sendChan txSubscribe (Unsub sendToMe)
-             sendChan txGameMsg (sendPortId sendToMe, Leave)
+             sendChan txSubscribe (Unsub txToPlayer)
+             sendChan txGameMsg (sendPortId txToPlayer, Leave)
        _ <-
          spawnLocal $
-         receiveFromPlayerProcess sendToMe txGameMsg disconnectHandler connection
-       sendChan txSubscribe (Sub sendToMe)
-       sendChan txGameMsg (sendPortId sendToMe, Join)
-       announceToPlayerProcess connection receiveFromBroadcaster disconnectHandler
+         receiveFromPlayerProcess txToPlayer txGameMsg disconnectHandler connection
+       sendChan txSubscribe (Sub txToPlayer)
+       sendChan txGameMsg (sendPortId txToPlayer, Join)
+       announceToPlayerProcess connection rxFromBroadcaster disconnectHandler
 
 ------------------------------------------------------------
 -- Player
@@ -121,14 +124,13 @@ receiveFromPlayerProcess
   -> (WS.ConnectionException -> Process ())
   -> WS.Connection
   -> Process ()
-receiveFromPlayerProcess sendToMe txGameMsg disconnectHandler connection = do
+receiveFromPlayerProcess txToPlayer txGameMsg disconnectHandler connection = do
   liftIO $ putStrLn "P: LISTENING"
   handle Nothing
   where
     handle :: Maybe UTCTime -> Process ()
     handle lastMessageHandled = do
-      raw :: Either WS.ConnectionException WS.DataMessage <-
-        liftIO . Ex.try $ WS.receiveDataMessage connection
+      raw <- liftIO . Ex.try $ WS.receiveDataMessage connection
       case raw of
         Left ex -> disconnectHandler ex
         Right (WS.Binary _) -> handle lastMessageHandled
@@ -143,17 +145,14 @@ receiveFromPlayerProcess sendToMe txGameMsg disconnectHandler connection = do
               now <- liftIO getCurrentTime
               case lastMessageHandled of
                 Nothing -> do
-                  sendChan txGameMsg (sendPortId sendToMe, GameMsg msg)
+                  sendChan txGameMsg (sendPortId txToPlayer, GameMsg msg)
                   handle (Just now)
                 Just t ->
                   if addUTCTime timeBetweenCommands t < now
                     then do
-                      sendChan txGameMsg (sendPortId sendToMe, GameMsg msg)
+                      sendChan txGameMsg (sendPortId txToPlayer, GameMsg msg)
                       handle (Just now)
                     else handle lastMessageHandled
-
-timeBetweenCommands :: NominalDiffTime
-timeBetweenCommands = 0.1
 
 announceToPlayerProcess
   :: (Show view, Serializable view, ToJSON view)
@@ -165,11 +164,10 @@ announceToPlayerProcess connection rx disconnectHandler = handle
   where
     handle = do
       msg <- receiveChan rx
-      sent :: Either WS.ConnectionException () <-
-        liftIO . Ex.try . WS.sendTextData connection $ Aeson.encode msg
+      sent <- liftIO . Ex.try . WS.sendTextData connection $ Aeson.encode msg
       case sent of
-        Right _ -> handle
         Left ex -> disconnectHandler ex
+        Right _ -> handle
 
 ------------------------------------------------------------
 -- Broadcaster
@@ -208,11 +206,11 @@ gameProcess
   -> (state -> view)
   -> state
   -> Process ()
-gameProcess rxGameMsg txGameState updateFn viewFn = iterateM_ handle
+gameProcess rxGameMsg txGameView updateFn viewFn = iterateM_ handle
   where
     handle game = do
       (replyTo, msg) <- receiveChan rxGameMsg
       liftIO . putStrLn $ "G: Heard: " <> show msg
       let newGame = updateFn (replyTo, msg) game
-      sendChan txGameState (viewFn newGame)
+      sendChan txGameView (viewFn newGame)
       return newGame
