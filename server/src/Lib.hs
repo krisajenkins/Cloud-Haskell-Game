@@ -18,6 +18,7 @@ import           Data.Binary
 import           Data.Foldable
 import           Data.Monoid
 import qualified Data.Set                                 as Set
+import qualified Data.Text                                as T
 import           Data.Time
 import           GHC.Generics
 import           Network.Transport.InMemory
@@ -56,22 +57,20 @@ runGame
   -> state
   -> IO ()
 runGame update view initialGameState =
-  let websocketPort = 9000
+  let websocketPort = 8000
   in runStdoutLoggingT $
      do logInfoN "START"
-        logInfoN "Booting Cloud Haskell"
+        logInfoN $ "Booting Cloud Haskell"
         backend <- liftIO createTransport
-        logInfoN "Creating Node"
         node <- liftIO $ newLocalNode backend initRemoteTable
-        logInfoN "Forking listener."
+        logInfoN $ "Starting listener on port: " <> T.pack (show websocketPort)
         _ <-
           liftIO . runProcess node $
           do (txSubscription, rxSubscription) <- newChan
              (txGameView, rxGameView) <- newChan
              (txGameMsg, rxGameMsg) <- newChan
              _ <- spawnLocal $ broadcastProcess rxGameView rxSubscription
-             _ <-
-               spawnLocal $ gameProcess rxGameMsg txGameView update view initialGameState
+             _ <- spawnLocal $ gameProcess rxGameMsg txGameView update view initialGameState
              liftIO . Warp.run websocketPort $
                websocketsOr
                  WS.defaultConnectionOptions
