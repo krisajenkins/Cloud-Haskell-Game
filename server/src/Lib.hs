@@ -116,6 +116,7 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
 ------------------------------------------------------------
 -- Player
 ------------------------------------------------------------
+-- TODO This process could do with some refactoring.
 receiveFromPlayerProcess
   :: (Serializable view, Show view, Serializable msg, Show msg, FromJSON msg)
   => SendPort view

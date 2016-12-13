@@ -5,7 +5,11 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-module PresentDrop where
+module PresentDrop
+  ( initialModel
+  , update
+  , view
+  ) where
 
 import           Control.Distributed.Process
 import           Control.Lens                (at, ix, makeLenses, over, set,
@@ -78,9 +82,40 @@ instance ToJSON View where
 
 instance ToJSON ViewGps where
   toJSON = genericToJSON $ aesonDrop 7 camelCase
+  ------------------------------------------------------------
 
-init :: StdGen -> Model
-init stdGen =
+hypotenuse
+  :: Floating r
+  => r -> r -> r
+hypotenuse dx dy = sqrt $ (dx ^ (2 :: Int)) + (dy ^ (2 :: Int))
+
+normalise
+  :: (Floating r, Ord r)
+  => (r, r) -> (r, r)
+normalise (dx, dy) =
+  if h <= 1
+    then (dx, dy)
+    else (dx / h, dy / h)
+  where
+    h = hypotenuse dx dy
+
+distanceBetween :: Coords -> Coords -> Double
+distanceBetween a b = hypotenuse dx dy
+  where
+    dx = Lens.view x a - Lens.view x b
+    dy = Lens.view y a - Lens.view y b
+
+randomPair
+  :: (RandomGen g, Random a)
+  => (a, a) -> g -> ((a, a), g)
+randomPair range stdGen = ((a, b), stdGen'')
+  where
+    (a, stdGen') = randomR range stdGen
+    (b, stdGen'') = randomR range stdGen'
+
+------------------------------------------------------------
+initialModel :: StdGen -> Model
+initialModel stdGen =
   Model
   { _players = Map.empty
   , _gpss =
@@ -119,14 +154,6 @@ data Msg
 update :: (SendPortId, EngineMsg Msg) -> Model -> Model
 update msg = handleWin . handleMsg msg
 
-randomPair
-  :: (RandomGen g, Random a)
-  => (a, a) -> g -> ((a, a), g)
-randomPair range stdGen = ((a, b), stdGen'')
-  where
-    (a, stdGen') = randomR range stdGen
-    (b, stdGen'') = randomR range stdGen'
-
 handleWin :: Model -> Model
 handleWin model =
   if null overlappingPlayers
@@ -147,27 +174,6 @@ handleWin model =
     inRange :: Player -> Bool
     inRange player =
       distanceBetween (Lens.view present model) (Lens.view position player) < 1
-
-hypotenuse
-  :: Floating r
-  => r -> r -> r
-hypotenuse dx dy = sqrt $ (dx ^ (2 :: Int)) + (dy ^ (2 :: Int))
-
-normalise
-  :: (Floating r, Ord r)
-  => (r, r) -> (r, r)
-normalise (dx, dy) =
-  if h <= 1
-    then (dx, dy)
-    else (dx / h, dy / h)
-  where
-    h = hypotenuse dx dy
-
-distanceBetween :: Coords -> Coords -> Double
-distanceBetween a b = hypotenuse dx dy
-  where
-    dx = Lens.view x a - Lens.view x b
-    dy = Lens.view y a - Lens.view y b
 
 handleMsg :: (SendPortId, EngineMsg Msg) -> Model -> Model
 handleMsg (playerId, Join) model =

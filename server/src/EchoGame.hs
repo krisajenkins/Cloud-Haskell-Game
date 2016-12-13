@@ -2,7 +2,11 @@
 {-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module EchoGame where
+module EchoGame
+  ( initialModel
+  , update
+  , view
+  ) where
 
 import           Control.Distributed.Process
 import           Data.Binary
@@ -18,8 +22,8 @@ data Model = Model
   , msgCount :: Int
   } deriving (Show, Eq, Binary, Generic)
 
-init :: Model
-init =
+initialModel :: Model
+initialModel =
   Model
   { lastMsg = Nothing
   , msgCount = 0
