@@ -176,15 +176,11 @@ handleWin model =
       distanceBetween (Lens.view present model) (Lens.view position player) < 1
 
 handleMsg :: (SendPortId, EngineMsg Msg) -> Model -> Model
-handleMsg (playerId, Join) model =
-  set (players . at playerId) (Just newPlayer) model
-handleMsg (playerId, Leave) model = set (players . at playerId) Nothing model
-handleMsg (playerId, GameMsg (SetName newName)) model =
-  set (players . ix playerId . name) newName model
-handleMsg (playerId, GameMsg (SetColor text)) model =
-  set (players . ix playerId . color) (Just text) model
-handleMsg (playerId, GameMsg (Move moveTo)) model =
-  over (players . ix playerId . position) updatePosition model
+handleMsg (playerId, Join) = set (players . at playerId) (Just newPlayer)
+handleMsg (playerId, Leave) = set (players . at playerId) Nothing
+handleMsg (playerId, GameMsg (SetName newName)) = set (players . ix playerId . name) newName
+handleMsg (playerId, GameMsg (SetColor text)) = set (players . ix playerId . color) (Just text)
+handleMsg (playerId, GameMsg (Move moveTo)) = over (players . ix playerId . position) updatePosition
   where
     updatePosition = over x (dx +) . over y (dy +)
     (dx, dy) = normalise (Lens.view x moveTo, Lens.view y moveTo)
