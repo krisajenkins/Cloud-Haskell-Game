@@ -158,22 +158,24 @@ handleWin :: Model -> Model
 handleWin model =
   if null overlappingPlayers
     then model
-    else let ((newX, newY), stdGen) = randomPair (-10, 10) $ Lens.view rng model
-             withIncrementedScores aModel =
+    else let withIncrementedScores aModel =
                Map.foldlWithKey
                  (\aModel' portId _ ->
                      over (players . ix portId . score) (+ 1) aModel')
                  aModel
                  overlappingPlayers
-             withMovedPresent = set present (Coords newX newY)
-             withNewStdGen = set rng stdGen
-         in withNewStdGen . withMovedPresent . withIncrementedScores $ model
+         in movePresent . withIncrementedScores $ model
   where
     overlappingPlayers :: Map SendPortId Player
     overlappingPlayers = Map.filter inRange (Lens.view players model)
     inRange :: Player -> Bool
     inRange player =
       distanceBetween (Lens.view present model) (Lens.view position player) < 1
+
+movePresent :: Model -> Model
+movePresent model = set rng newRng $ set present (Coords newX newY) model
+  where
+    ((newX, newY), newRng) = randomPair (-10, 10) $ Lens.view rng model
 
 handleMsg :: (SendPortId, EngineMsg Msg) -> Model -> Model
 handleMsg (playerId, Join) = set (players . at playerId) (Just newPlayer)
