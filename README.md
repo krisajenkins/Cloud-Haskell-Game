@@ -1,6 +1,13 @@
-# Cloud Haskell Game
+# Santa's Present Drop - A Websockets Game
 
-This is a game server that uses websockets and Cloud Haskell.
+Santa has given up with chimneys and is just dropping presents from
+the sky. Its your job to run through the city picking them up. But
+there's a catch - you can't see the present. All you know is its
+distance from three GPS base-stations.
+
+Break out your websockets library and your finest trigonometry,
+connect to the server and triangulate the position of the present
+before anyone else does!
 
 # Building
 
@@ -24,7 +31,11 @@ stack exec cloud-haskell-game
 
 ## Developing
 
-Take a look at `server/src/EchoGame.hs` to see how a basic game is constructed.
+Take a look at [EchoGame](server/src/EchoGame.hs) to see how a basic
+game is constructed. Then look
+at [PresentDrop](server/src/PresentDrop.hs) for the real game
+logic. All the websocket/cloud-haskell wiring is
+in [Lib](server/src/Lib.hs).
 
 ## Copyright
 
