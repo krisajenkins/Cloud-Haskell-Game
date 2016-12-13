@@ -107,8 +107,7 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
              sendChan txSubscribe (Unsub txToPlayer)
              sendChan txGameMsg (sendPortId txToPlayer, Leave)
        _ <-
-         spawnLocal $
-         receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
+         spawnLocal $ receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
        sendChan txSubscribe (Sub txToPlayer)
        sendChan txGameMsg (sendPortId txToPlayer, Join)
        announceToPlayer connection rxFromBroadcaster disconnectHandler
