@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveAnyClass  #-}
-{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module EchoGame
@@ -8,11 +8,11 @@ module EchoGame
   , view
   ) where
 
-import           Control.Distributed.Process
-import           Data.Binary
-import           Data.Text                   (Text)
-import           GHC.Generics
-import           Network.GameEngine
+import Control.Distributed.Process
+import Data.Binary
+import Data.Text (Text)
+import GHC.Generics
+import Network.GameEngine
 
 ------------------------------------------------------------
 -- This Specific Game

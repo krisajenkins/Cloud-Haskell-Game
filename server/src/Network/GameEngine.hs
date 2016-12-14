@@ -1,31 +1,31 @@
-{-# LANGUAGE DeriveAnyClass      #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Network.GameEngine where
 
-import           Control.Distributed.Process
-import           Control.Distributed.Process.Node
-import           Control.Distributed.Process.Serializable
-import qualified Control.Exception                        as Ex
-import           Control.Monad.Logger
-import           Control.Monad.Loops
-import           Control.Monad.Trans.Resource
-import           Data.Aeson                               (FromJSON, ToJSON)
-import qualified Data.Aeson                               as Aeson
-import           Data.Binary
-import           Data.Foldable
-import           Data.Monoid
-import qualified Data.Set                                 as Set
-import qualified Data.Text                                as T
-import           Data.Time
-import           GHC.Generics
-import           Network.Transport.InMemory
-import           Network.Wai.Application.Static
-import qualified Network.Wai.Handler.Warp                 as Warp
-import           Network.Wai.Handler.WebSockets
-import qualified Network.WebSockets                       as WS
+import Control.Distributed.Process
+import Control.Distributed.Process.Node
+import Control.Distributed.Process.Serializable
+import qualified Control.Exception as Ex
+import Control.Monad.Logger
+import Control.Monad.Loops
+import Control.Monad.Trans.Resource
+import Data.Aeson (FromJSON, ToJSON)
+import qualified Data.Aeson as Aeson
+import Data.Binary
+import Data.Foldable
+import Data.Monoid
+import qualified Data.Set as Set
+import qualified Data.Text as T
+import Data.Time
+import GHC.Generics
+import Network.Transport.InMemory
+import Network.Wai.Application.Static
+import qualified Network.Wai.Handler.Warp as Warp
+import Network.Wai.Handler.WebSockets
+import qualified Network.WebSockets as WS
 
 data EngineMsg msg
   = Join

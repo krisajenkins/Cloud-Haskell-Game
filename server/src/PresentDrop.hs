@@ -1,9 +1,9 @@
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE NamedFieldPuns    #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module PresentDrop
   ( initialModel
@@ -11,19 +11,18 @@ module PresentDrop
   , view
   ) where
 
-import           Control.Distributed.Process
-import           Control.Lens                (at, ix, makeLenses, over, set,
-                                              toListOf)
-import qualified Control.Lens                as Lens
-import           Data.Aeson
-import           Data.Aeson.Casing
-import           Data.Binary
-import           Data.Map.Strict             (Map)
-import qualified Data.Map.Strict             as Map
-import           Data.Text                   (Text)
-import           GHC.Generics
-import           Network.GameEngine
-import           System.Random
+import Control.Distributed.Process
+import Control.Lens (at, ix, makeLenses, over, set, toListOf)
+import qualified Control.Lens as Lens
+import Data.Aeson
+import Data.Aeson.Casing
+import Data.Binary
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Text (Text)
+import GHC.Generics
+import Network.GameEngine
+import System.Random
 
 data Coords = Coords
   { _x :: Double
@@ -32,21 +31,21 @@ data Coords = Coords
 
 data Player = Player
   { _position :: Coords
-  , _score    :: Integer
-  , _name     :: Text
-  , _color    :: Text
+  , _score :: Integer
+  , _name :: Text
+  , _color :: Text
   } deriving (Show, Eq, Binary, Generic)
 
 data Gps = Gps
   { _gpsPosition :: Coords
-  , _variance    :: Double
+  , _variance :: Double
   } deriving (Show, Eq, Binary, Generic)
 
 data Model = Model
   { _players :: Map SendPortId Player
-  , _gpss    :: [Gps]
+  , _gpss :: [Gps]
   , _present :: Coords
-  , _rng     :: StdGen
+  , _rng :: StdGen
   } deriving (Show)
 
 makeLenses ''Coords
@@ -67,8 +66,8 @@ instance ToJSON Player where
   toJSON = genericToJSON $ aesonDrop 1 camelCase
 
 data View = View
-  { viewPlayers        :: [Player]
-  , viewGpss           :: [ViewGps]
+  { viewPlayers :: [Player]
+  , viewGpss :: [ViewGps]
   , viewSampleCommands :: [Msg]
   } deriving (Show, Eq, Binary, Generic)
 
