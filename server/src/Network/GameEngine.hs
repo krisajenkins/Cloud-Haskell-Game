@@ -52,11 +52,11 @@ runGame
      ,Show view
      ,Show state
      ,Show msg)
-  => ((SendPortId, EngineMsg msg) -> state -> state)
+  => state
+  -> ((SendPortId, EngineMsg msg) -> state -> state)
   -> (state -> view)
-  -> state
   -> IO ()
-runGame update view initialGameState =
+runGame initialGameState update view =
   let websocketPort = 8000
   in runStdoutLoggingT $
      do logInfoN "START"

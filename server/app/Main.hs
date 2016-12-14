@@ -8,12 +8,13 @@ import qualified PresentDrop
 import           System.Random
 
 oldMain :: IO ()
-oldMain = Network.GameEngine.runGame EchoGame.update EchoGame.view EchoGame.initialModel
+oldMain =
+  Network.GameEngine.runGame EchoGame.initialModel EchoGame.update EchoGame.view
 
 main :: IO ()
 main = do
   stdGen <- getStdGen
   Network.GameEngine.runGame
+    (PresentDrop.initialModel stdGen)
     PresentDrop.update
     PresentDrop.view
-    (PresentDrop.initialModel stdGen)
