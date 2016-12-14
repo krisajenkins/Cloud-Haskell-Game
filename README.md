@@ -39,6 +39,12 @@ at [PresentDrop](server/src/PresentDrop.hs) for the real game
 logic. All the websocket/cloud-haskell wiring is
 in [Lib](server/src/Lib.hs).
 
+## Solutions
+
+* [Scala](https://github.com/mnd999/xmas-hack)
+* [Haskell](https://github.com/mattjbray/santas-present-drop/blob/master/app/Main.hs)
+* [Go](https://github.com/simonswine/hack-night-xmas-2016)
+
 ## Copyright
 
 © Kris Jenkins, 2016.
