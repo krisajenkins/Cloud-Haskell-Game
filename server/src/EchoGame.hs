@@ -12,7 +12,7 @@ import           Control.Distributed.Process
 import           Data.Binary
 import           Data.Text                   (Text)
 import           GHC.Generics
-import           Lib
+import           Network.GameEngine
 
 ------------------------------------------------------------
 -- This Specific Game

@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Lib where
+module Network.GameEngine where
 
 import           Control.Distributed.Process
 import           Control.Distributed.Process.Node

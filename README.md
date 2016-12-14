@@ -37,7 +37,7 @@ Take a look at [EchoGame](server/src/EchoGame.hs) to see how a basic
 game is constructed. Then look
 at [PresentDrop](server/src/PresentDrop.hs) for the real game
 logic. All the websocket/cloud-haskell wiring is
-in [Lib](server/src/Lib.hs).
+in [Network.GameEngine](server/src/Network/GameEngine.hs).
 
 ## Solutions
 
