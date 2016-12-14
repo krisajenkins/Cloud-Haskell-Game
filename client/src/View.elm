@@ -2,7 +2,6 @@ module View exposing (..)
 
 import CDN exposing (bootstrap)
 import Exts.Html exposing (nbsp)
-import Formatting as F exposing ((<>))
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -126,10 +125,7 @@ playerView player =
             ]
             [ text nbsp ]
         , div [ style [ ( "flex-grow", "1" ) ] ]
-            [ F.html (F.s "(" <> F.int <> F.s ") " <> F.string)
-                player.score
-                player.name
-            ]
+            [ text player.name ]
         , div [ class "badge" ]
             [ text <| toString player.score ]
         ]
