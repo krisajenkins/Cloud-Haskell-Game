@@ -39,8 +39,8 @@ data PubSubMsg view
   | Unsub (SendPort view)
   deriving (Show, Eq, Binary, Generic)
 
-timeBetweenCommands :: NominalDiffTime
-timeBetweenCommands = 0.1
+timeBetweenPlayerCommands :: NominalDiffTime
+timeBetweenPlayerCommands = 0.1
 
 ------------------------------------------------------------
 -- Websocket Server & Wiring.
@@ -145,7 +145,7 @@ receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection = do
                   sendChan txGameMsg $ GameMsg (sendPortId txToPlayer) msg
                   handle (Just now)
                 Just t ->
-                  if addUTCTime timeBetweenCommands t < now
+                  if addUTCTime timeBetweenPlayerCommands t < now
                     then do
                       sendChan txGameMsg $ GameMsg (sendPortId txToPlayer) msg
                       handle (Just now)
