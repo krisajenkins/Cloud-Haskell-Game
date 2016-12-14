@@ -45,7 +45,6 @@ heading : Html Msg
 heading =
     div [ style [ ( "text-align", "center" ) ] ]
         [ h1 [] [ text "Santa's Present Drop" ]
-        , h3 [] [ text "http://game.clearercode.com" ]
         , controls
         ]
 
