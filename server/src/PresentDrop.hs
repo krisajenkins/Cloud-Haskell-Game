@@ -150,7 +150,7 @@ data Msg
   | Move Coords
   deriving (Show, Eq, Binary, Generic, FromJSON, ToJSON)
 
-update :: (SendPortId, EngineMsg Msg) -> Model -> Model
+update :: EngineMsg Msg -> Model -> Model
 update msg = handleWin . handleMsg msg
 
 handleWin :: Model -> Model
@@ -176,14 +176,14 @@ movePresent model = set rng newRng $ set present (Coords newX newY) model
   where
     ((newX, newY), newRng) = randomPair (-10, 10) $ Lens.view rng model
 
-handleMsg :: (SendPortId, EngineMsg Msg) -> Model -> Model
-handleMsg (playerId, Join) = set (players . at playerId) (Just newPlayer)
-handleMsg (playerId, Leave) = set (players . at playerId) Nothing
-handleMsg (playerId, GameMsg (SetName newName)) =
+handleMsg :: EngineMsg Msg -> Model -> Model
+handleMsg (Join playerId) = set (players . at playerId) (Just newPlayer)
+handleMsg (Leave playerId) = set (players . at playerId) Nothing
+handleMsg (GameMsg playerId (SetName newName)) =
   set (players . ix playerId . name) newName
-handleMsg (playerId, GameMsg (SetColor text)) =
+handleMsg (GameMsg playerId (SetColor text)) =
   set (players . ix playerId . color) text
-handleMsg (playerId, GameMsg (Move moveTo)) =
+handleMsg (GameMsg playerId (Move moveTo)) =
   over (players . ix playerId . position) updatePosition
   where
     updatePosition = over x (dx +) . over y (dy +)

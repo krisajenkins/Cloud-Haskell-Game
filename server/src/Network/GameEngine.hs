@@ -28,9 +28,10 @@ import Network.Wai.Handler.WebSockets
 import qualified Network.WebSockets as WS
 
 data EngineMsg msg
-  = Join
-  | Leave
-  | GameMsg msg
+  = Join SendPortId
+  | Leave SendPortId
+  | GameMsg SendPortId
+            msg
   deriving (Show, Eq, Binary, Generic)
 
 data PubSubMsg view
@@ -52,10 +53,7 @@ runGame
      ,Show view
      ,Show state
      ,Show msg)
-  => state
-  -> ((SendPortId, EngineMsg msg) -> state -> state)
-  -> (state -> view)
-  -> IO ()
+  => state -> (EngineMsg msg -> state -> state) -> (state -> view) -> IO ()
 runGame initialGameState update view =
   let websocketPort = 8000
   in runStdoutLoggingT $
@@ -87,7 +85,7 @@ acceptClientConnection
      ,Show view
      ,Show msg)
   => LocalNode
-  -> SendPort (SendPortId, EngineMsg msg)
+  -> SendPort (EngineMsg msg)
   -> SendPort (PubSubMsg view)
   -> WS.PendingConnection
   -> m ()
@@ -105,11 +103,11 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
              liftIO . putStrLn $
                "P: Socket has closed. Unsubscribing: " <> show ex
              sendChan txSubscribe (Unsub txToPlayer)
-             sendChan txGameMsg (sendPortId txToPlayer, Leave)
+             sendChan txGameMsg $ Leave (sendPortId txToPlayer)
        _ <-
          spawnLocal $ receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
        sendChan txSubscribe (Sub txToPlayer)
-       sendChan txGameMsg (sendPortId txToPlayer, Join)
+       sendChan txGameMsg $ Join (sendPortId txToPlayer)
        announceToPlayer connection rxFromBroadcaster disconnectHandler
 
 ------------------------------------------------------------
@@ -119,7 +117,7 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
 receiveFromPlayer
   :: (Serializable msg, Serializable view, Show msg, Show view, FromJSON msg)
   => SendPort view
-  -> SendPort (SendPortId, EngineMsg msg)
+  -> SendPort (EngineMsg msg)
   -> (WS.ConnectionException -> Process ())
   -> WS.Connection
   -> Process ()
@@ -144,12 +142,12 @@ receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection = do
               now <- liftIO getCurrentTime
               case lastMessageHandled of
                 Nothing -> do
-                  sendChan txGameMsg (sendPortId txToPlayer, GameMsg msg)
+                  sendChan txGameMsg $ GameMsg (sendPortId txToPlayer) msg
                   handle (Just now)
                 Just t ->
                   if addUTCTime timeBetweenCommands t < now
                     then do
-                      sendChan txGameMsg (sendPortId txToPlayer, GameMsg msg)
+                      sendChan txGameMsg $ GameMsg (sendPortId txToPlayer) msg
                       handle (Just now)
                     else handle lastMessageHandled
 
@@ -199,17 +197,17 @@ broadcaster inboundGame subscriptionRequests = iterateM_ handle Set.empty
 ------------------------------------------------------------
 gameProcess
   :: (Serializable msg, Serializable view, Show msg, Show state)
-  => ReceivePort (SendPortId, msg)
+  => ReceivePort (EngineMsg msg)
   -> SendPort view
-  -> ((SendPortId, msg) -> state -> state)
+  -> (EngineMsg msg -> state -> state)
   -> (state -> view)
   -> state
   -> Process ()
 gameProcess rxGameMsg txGameView updateFn viewFn = iterateM_ handle
   where
     handle game = do
-      (replyTo, msg) <- receiveChan rxGameMsg
+      msg <- receiveChan rxGameMsg
       liftIO . putStrLn $ "G: Heard: " <> show msg
-      let newGame = updateFn (replyTo, msg) game
+      let newGame = updateFn msg game
       sendChan txGameView (viewFn newGame)
       return newGame

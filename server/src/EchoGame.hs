@@ -18,7 +18,7 @@ import Network.GameEngine
 -- This Specific Game
 ------------------------------------------------------------
 data Model = Model
-  { lastMsg  :: Maybe (String, Text)
+  { lastMsg :: Maybe (String, Text)
   , msgCount :: Int
   } deriving (Show, Eq, Binary, Generic)
 
@@ -29,10 +29,10 @@ initialModel =
   , msgCount = 0
   }
 
-update :: (SendPortId, EngineMsg Text) -> Model -> Model
-update (_, Join) model = model
-update (_, Leave) model = model
-update (portId, GameMsg msg) model =
+update :: EngineMsg Text -> Model -> Model
+update (Join _) model = model
+update (Leave _) model = model
+update (GameMsg portId msg) model =
   Model
   { lastMsg = Just (show portId, msg)
   , msgCount = msgCount model + 1
