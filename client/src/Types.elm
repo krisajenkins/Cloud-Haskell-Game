@@ -29,10 +29,14 @@ type alias Board =
     }
 
 
-type Msg
+type GameMsg
     = SetName String
     | SetColor String
     | Move Coords
+
+
+type Msg
+    = GameMsg GameMsg
     | Receive (RemoteData String Board)
     | KeepAlive
 

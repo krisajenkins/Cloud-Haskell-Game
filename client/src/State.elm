@@ -26,48 +26,42 @@ update msg model =
         KeepAlive ->
             ( model, Cmd.none )
 
-        SetName string ->
-            ( model
-            , WebSocket.send websocketEndpoint
-                (E.object
-                    [ ( "tag", E.string "SetName" )
-                    , ( "contents", E.string string )
-                    ]
-                    |> E.encode 0
-                )
-            )
-
-        SetColor string ->
-            ( model
-            , WebSocket.send websocketEndpoint
-                (E.object
-                    [ ( "tag", E.string "SetColor" )
-                    , ( "contents", E.string string )
-                    ]
-                    |> E.encode 0
-                )
-            )
-
-        Move to ->
-            ( model
-            , WebSocket.send websocketEndpoint
-                (E.object
-                    [ ( "tag", E.string "Move" )
-                    , ( "contents"
-                      , E.object
-                            [ ( "x", E.float to.x )
-                            , ( "y", E.float to.y )
-                            ]
-                      )
-                    ]
-                    |> E.encode 0
-                )
-            )
-
         Receive response ->
             ( response
             , Cmd.none
             )
+
+        GameMsg submsg ->
+            ( model
+            , encodeGameMsg submsg
+                |> E.encode 0
+                |> WebSocket.send websocketEndpoint
+            )
+
+
+encodeGameMsg : GameMsg -> E.Value
+encodeGameMsg msg =
+    E.object
+        <| case msg of
+            SetName string ->
+                [ ( "tag", E.string "SetName" )
+                , ( "contents", E.string string )
+                ]
+
+            SetColor string ->
+                [ ( "tag", E.string "SetColor" )
+                , ( "contents", E.string string )
+                ]
+
+            Move to ->
+                [ ( "tag", E.string "Move" )
+                , ( "contents"
+                  , E.object
+                        [ ( "x", E.float to.x )
+                        , ( "y", E.float to.y )
+                        ]
+                  )
+                ]
 
 
 decodeCoords : Decoder Coords

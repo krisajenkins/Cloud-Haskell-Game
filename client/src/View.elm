@@ -45,7 +45,7 @@ heading : Html Msg
 heading =
     div [ style [ ( "text-align", "center" ) ] ]
         [ h1 [] [ text "Santa's Present Drop" ]
-        , controls
+        , Html.map GameMsg controls
         ]
 
 
@@ -106,7 +106,7 @@ playerView player =
         ]
 
 
-controls : Html Msg
+controls : Html GameMsg
 controls =
     let
         simpleButton label msg =
