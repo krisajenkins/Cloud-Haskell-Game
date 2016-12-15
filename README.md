@@ -44,6 +44,7 @@ in [Network.GameEngine](server/src/Network/GameEngine.hs).
 * [Scala](https://github.com/mnd999/xmas-hack)
 * [Haskell](https://github.com/mattjbray/santas-present-drop/blob/master/app/Main.hs)
 * [Go](https://github.com/simonswine/hack-night-xmas-2016)
+* [Elm](https://github.com/MatMoore/xmas-present-retrieval-hack)
 
 ## Copyright
 
