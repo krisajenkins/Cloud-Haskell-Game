@@ -41,6 +41,7 @@ library
                      , resourcet
                      , stm
                      , text
+                     , formatting
                      , transformers
                      , wai
                      , wai-websockets

@@ -6,6 +6,7 @@
 module Network.GameEngine where
 
 import Control.Distributed.Process
+import Formatting as F
 import Control.Distributed.Process.Node
 import Control.Distributed.Process.Serializable
 import qualified Control.Exception as Ex
@@ -55,13 +56,17 @@ runGame
      ,Show msg)
   => state -> (EngineMsg msg -> state -> state) -> (state -> view) -> IO ()
 runGame initialGameState update view =
-  let settings :: Warp.Settings = Warp.setHost "*" ( Warp.setPort 8000 Warp.defaultSettings )
+  let settings = Warp.setHost "*" . Warp.setPort 8000 $ Warp.defaultSettings
   in runStdoutLoggingT $
      do logInfoN "START"
         logInfoN "Booting Cloud Haskell"
         backend <- liftIO createTransport
         node <- liftIO $ newLocalNode backend initRemoteTable
-        logInfoN $ "Starting listener on port: " <> T.pack ( show ( Warp.getPort settings ) )
+        logInfoN $
+          sformat
+            ("Starting listener with settings: " % F.string % ":" % F.int)
+            (show $ Warp.getHost settings)
+            (Warp.getPort settings)
         _ <-
           liftIO . runProcess node $
           do (txSubscription, rxSubscription) <- newChan
