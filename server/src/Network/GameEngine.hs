@@ -55,13 +55,13 @@ runGame
      ,Show msg)
   => state -> (EngineMsg msg -> state -> state) -> (state -> view) -> IO ()
 runGame initialGameState update view =
-  let websocketPort = 8000
+  let settings :: Warp.Settings = Warp.setHost "*" ( Warp.setPort 8000 Warp.defaultSettings )
   in runStdoutLoggingT $
      do logInfoN "START"
         logInfoN "Booting Cloud Haskell"
         backend <- liftIO createTransport
         node <- liftIO $ newLocalNode backend initRemoteTable
-        logInfoN $ "Starting listener on port: " <> T.pack (show websocketPort)
+        logInfoN $ "Starting listener on port: " <> T.pack ( show ( Warp.getPort settings ) )
         _ <-
           liftIO . runProcess node $
           do (txSubscription, rxSubscription) <- newChan
@@ -69,7 +69,7 @@ runGame initialGameState update view =
              (txGameMsg, rxGameMsg) <- newChan
              _ <- spawnLocal $ broadcaster rxGameView rxSubscription
              _ <- spawnLocal $ gameProcess rxGameMsg txGameView update view initialGameState
-             liftIO . Warp.run websocketPort $
+             liftIO . Warp.runSettings settings $
                websocketsOr
                  WS.defaultConnectionOptions
                  (runResourceT . acceptClientConnection node txGameMsg txSubscription)
