@@ -118,7 +118,7 @@ acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
 ------------------------------------------------------------
 -- Player
 ------------------------------------------------------------
--- TODO This process could do with some refactoring.
+-- TODO This process could do with some refactoring. The walking-cases are a bad sign.
 receiveFromPlayer
   :: (Serializable msg, Serializable view, Show msg, Show view, FromJSON msg)
   => SendPort view
