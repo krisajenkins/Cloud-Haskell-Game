@@ -44,7 +44,7 @@ remoteDataView view remoteData =
 heading : Html Msg
 heading =
     div [ style [ ( "text-align", "center" ) ] ]
-        [ h1 [] [ text "Santa's Present Drop" ]
+        [ h1 [] [ text "Triangulation!" ]
         , Html.map GameMsg controls
         ]
 
