@@ -1,0 +1,65 @@
+name: cloud-haskell-game
+version: '0.1.0.0'
+synopsis: Initial project template from stack
+description: Please see README.md
+category: Web
+author: Kris Jenkins
+maintainer: krisajenkins@gmail.com
+copyright: 2016 Kris Jenkins
+license: AllRightsReserved
+github: krisajenkins/cloud-haskell-game
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >=4.7 && <5
+  - random
+  - MonadRandom
+  - aeson
+  - aeson-casing
+  - binary
+  - time
+  - wai-app-static
+  - bytestring
+  - distributed-process
+  - distributed-process-simplelocalnet
+  - distributed-process-supervisor
+  - network-transport-inmemory
+  - network-transport-tcp
+  - containers
+  - lens
+  - megaparsec
+  - monad-logger
+  - monad-loops
+  - mtl
+  - resourcet
+  - stm
+  - text
+  - formatting
+  - transformers
+  - wai
+  - wai-websockets
+  - warp
+  - websockets
+  - yaml
+
+library:
+  source-dirs: src
+
+executables:
+  cloud-haskell-game:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+    - cloud-haskell-game
+
+tests:
+  cloud-haskell-game-test:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+    - cloud-haskell-game
+    - hspec
+    - hspec-core
+    - QuickCheck
+    - quickcheck-instances
