@@ -101,23 +101,23 @@ acceptClientConnection
 acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
   (_releaseKey, connection) <-
     allocate
-      (runStdoutLoggingT $
-       do logInfoN "P: New connection received."
-          liftIO $ WS.acceptRequest pendingConnection)
+      (runStdoutLoggingT $ do
+         logInfoN "P: New connection received."
+         liftIO $ WS.acceptRequest pendingConnection)
       (\_ -> putStrLn "P: Leaves")
-  liftIO . runProcess node $
-    do (txToPlayer, rxFromBroadcaster) <- newChan
-       let disconnectHandler :: WS.ConnectionException -> Process ()
-           disconnectHandler ex = do
-             liftIO . putStrLn $
-               "P: Socket has closed. Unsubscribing: " <> show ex
-             sendChan txSubscribe (Unsub txToPlayer)
-             sendChan txGameMsg $ Leave (sendPortId txToPlayer)
-       _ <-
-         spawnLocal $ receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
-       sendChan txSubscribe (Sub txToPlayer)
-       sendChan txGameMsg $ Join (sendPortId txToPlayer)
-       announceToPlayer connection rxFromBroadcaster disconnectHandler
+  liftIO . runProcess node $ do
+    (txToPlayer, rxFromBroadcaster) <- newChan
+    let disconnectHandler :: WS.ConnectionException -> Process ()
+        disconnectHandler ex = do
+          liftIO . putStrLn $ "P: Socket has closed. Unsubscribing: " <> show ex
+          sendChan txSubscribe (Unsub txToPlayer)
+          sendChan txGameMsg $ Leave (sendPortId txToPlayer)
+    _ <-
+      spawnLocal $
+      receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
+    sendChan txSubscribe (Sub txToPlayer)
+    sendChan txGameMsg $ Join (sendPortId txToPlayer)
+    announceToPlayer connection rxFromBroadcaster disconnectHandler
 
 ------------------------------------------------------------
 -- Player
