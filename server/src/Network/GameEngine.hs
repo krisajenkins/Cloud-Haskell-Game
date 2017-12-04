@@ -31,8 +31,7 @@ import qualified Network.WebSockets as WS
 data EngineMsg msg
   = Join SendPortId
   | Leave SendPortId
-  | GameMsg SendPortId
-            msg
+  | GameMsg SendPortId msg
   deriving (Show, Eq, Binary, Generic)
 
 data PubSubMsg view
@@ -47,48 +46,53 @@ timeBetweenPlayerCommands = 0.1
 -- Websocket Server & Wiring.
 ------------------------------------------------------------
 runGame
-  :: (Serializable msg
-     ,Serializable view
-     ,FromJSON msg
-     ,ToJSON view
-     ,Show view
-     ,Show state
-     ,Show msg)
+  :: ( Serializable msg
+     , Serializable view
+     , FromJSON msg
+     , ToJSON view
+     , Show view
+     , Show state
+     , Show msg
+     )
   => state -> (EngineMsg msg -> state -> state) -> (state -> view) -> IO ()
 runGame initialGameState update view =
   let settings = Warp.setHost "*" . Warp.setPort 8000 $ Warp.defaultSettings
-  in runStdoutLoggingT $
-     do logInfoN "START"
-        logInfoN "Booting Cloud Haskell"
-        backend <- liftIO createTransport
-        node <- liftIO $ newLocalNode backend initRemoteTable
-        logInfoN $
-          sformat
-            ("Starting listener with settings: " % F.string % ":" % F.int)
-            (show $ Warp.getHost settings)
-            (Warp.getPort settings)
-        _ <-
-          liftIO . runProcess node $
-          do (txSubscription, rxSubscription) <- newChan
-             (txGameView, rxGameView) <- newChan
-             (txGameMsg, rxGameMsg) <- newChan
-             _ <- spawnLocal $ broadcaster rxGameView rxSubscription
-             _ <- spawnLocal $ gameProcess rxGameMsg txGameView update view initialGameState
-             liftIO . Warp.runSettings settings $
-               websocketsOr
-                 WS.defaultConnectionOptions
-                 (runResourceT . acceptClientConnection node txGameMsg txSubscription)
-                 (staticApp $ defaultFileServerSettings "../client/dist")
-        logInfoN "END"
+  in runStdoutLoggingT $ do
+       logInfoN "START"
+       logInfoN "Booting Cloud Haskell"
+       backend <- liftIO createTransport
+       node <- liftIO $ newLocalNode backend initRemoteTable
+       logInfoN $
+         sformat
+           ("Starting listener with settings: " % F.string % ":" % F.int)
+           (show $ Warp.getHost settings)
+           (Warp.getPort settings)
+       _ <-
+         liftIO . runProcess node $ do
+           (txSubscription, rxSubscription) <- newChan
+           (txGameView, rxGameView) <- newChan
+           (txGameMsg, rxGameMsg) <- newChan
+           _ <- spawnLocal $ broadcaster rxGameView rxSubscription
+           _ <-
+             spawnLocal $
+             gameProcess rxGameMsg txGameView update view initialGameState
+           liftIO . Warp.runSettings settings $
+             websocketsOr
+               WS.defaultConnectionOptions
+               (runResourceT .
+                acceptClientConnection node txGameMsg txSubscription)
+               (staticApp $ defaultFileServerSettings "../client/dist")
+       logInfoN "END"
 
 acceptClientConnection
-  :: (MonadResource m
-     ,Serializable msg
-     ,Serializable view
-     ,FromJSON msg
-     ,ToJSON view
-     ,Show view
-     ,Show msg)
+  :: ( MonadResource m
+     , Serializable msg
+     , Serializable view
+     , FromJSON msg
+     , ToJSON view
+     , Show view
+     , Show msg
+     )
   => LocalNode
   -> SendPort (EngineMsg msg)
   -> SendPort (PubSubMsg view)
