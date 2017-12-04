@@ -23,32 +23,28 @@ import Data.Text (Text)
 import GHC.Generics
 import Network.GameEngine
 import System.Random
-
-data Coords = Coords
-  { _x :: Double
-  , _y :: Double
-  } deriving (Show, Eq, Binary, Generic)
+import Position
 
 data Player = Player
-  { _position :: Coords
+  { _position :: Position
   , _score :: Integer
   , _name :: Text
   , _color :: Text
   } deriving (Show, Eq, Binary, Generic)
 
 data Gps = Gps
-  { _gpsPosition :: Coords
+  { _gpsPosition :: Position
   , _variance :: Double
   } deriving (Show, Eq, Binary, Generic)
 
 data Model = Model
   { _players :: Map SendPortId Player
   , _gpss :: [Gps]
-  , _present :: Coords
+  , _present :: Position
   , _rng :: StdGen
   } deriving (Show)
 
-makeLenses ''Coords
+makeLenses ''Position
 
 makeLenses ''Player
 
@@ -56,10 +52,10 @@ makeLenses ''Gps
 
 makeLenses ''Model
 
-instance FromJSON Coords where
+instance FromJSON Position where
   parseJSON = genericParseJSON $ aesonDrop 1 camelCase
 
-instance ToJSON Coords where
+instance ToJSON Position where
   toJSON = genericToJSON $ aesonDrop 1 camelCase
 
 instance ToJSON Player where
@@ -72,7 +68,7 @@ data View = View
   } deriving (Show, Eq, Binary, Generic)
 
 data ViewGps = ViewGps
-  { viewGpsPosition :: Coords
+  { viewGpsPosition :: Position
   , viewGpsDistance :: Double
   } deriving (Show, Eq, Binary, Generic)
 
@@ -98,7 +94,7 @@ normalise (dx, dy) =
   where
     h = hypotenuse dx dy
 
-distanceBetween :: Coords -> Coords -> Double
+distanceBetween :: Position -> Position -> Double
 distanceBetween a b = hypotenuse dx dy
   where
     dx = Lens.view x a - Lens.view x b
@@ -119,19 +115,19 @@ initialModel stdGen =
   { _players = Map.empty
   , _gpss =
     [ Gps
-      { _gpsPosition = Coords (-10) (-8)
+      { _gpsPosition = Position (-10) (-8)
       , _variance = 0
       }
     , Gps
-      { _gpsPosition = Coords 12 (-5)
+      { _gpsPosition = Position 12 (-5)
       , _variance = 0
       }
     , Gps
-      { _gpsPosition = Coords (-4) 9
+      { _gpsPosition = Position (-4) 9
       , _variance = 0
       }
     ]
-  , _present = Coords 5 3
+  , _present = Position 5 3
   , _rng = stdGen
   }
 
@@ -140,14 +136,14 @@ newPlayer =
   Player
   { _name = "<Your Name Here>"
   , _score = 0
-  , _position = Coords 0 0
+  , _position = Position 0 0
   , _color = "white"
   }
 
 data Msg
   = SetName Text
   | SetColor Text
-  | Move Coords
+  | Move Position
   deriving (Show, Eq, Binary, Generic, FromJSON, ToJSON)
 
 update :: EngineMsg Msg -> Model -> Model
@@ -172,7 +168,7 @@ handleWin model =
       distanceBetween (Lens.view present model) (Lens.view position player) < 1
 
 movePresent :: Model -> Model
-movePresent model = set rng newRng $ set present (Coords newX newY) model
+movePresent model = set rng newRng $ set present (Position newX newY) model
   where
     ((newX, newY), newRng) = randomPair (-10, 10) $ Lens.view rng model
 
@@ -195,10 +191,10 @@ view model =
   { viewPlayers = toListOf (players . traverse) model
   , viewGpss = viewGps (Lens.view present model) <$> Lens.view gpss model
   , viewSampleCommands =
-    [SetName "Kris", SetColor "#ff0000", Move $ Coords 1.0 (-2.0)]
+    [SetName "Kris", SetColor "#ff0000", Move $ Position 1.0 (-2.0)]
   }
 
-viewGps :: Coords -> Gps -> ViewGps
+viewGps :: Position -> Gps -> ViewGps
 viewGps presentPosition gps =
   ViewGps
   { viewGpsPosition = Lens.view gpsPosition gps
