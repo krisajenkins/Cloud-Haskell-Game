@@ -6,21 +6,20 @@
 module Network.GameEngine where
 
 import Control.Distributed.Process
-import Formatting as F
+import Control.Distributed.Process.Extras.Time
+import Control.Distributed.Process.Extras.Timer
 import Control.Distributed.Process.Node
 import Control.Distributed.Process.Serializable
 import qualified Control.Exception as Ex
-import Control.Monad.Logger
+import Control.Monad (void)
 import Control.Monad.Loops
-import Control.Monad.Trans.Resource
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as Aeson
 import Data.Binary
 import Data.Foldable
-import Data.Monoid
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as T
-import Data.Time
 import GHC.Generics
 import Network.Transport.InMemory
 import Network.Wai.Application.Static
@@ -28,139 +27,122 @@ import qualified Network.Wai.Handler.Warp as Warp
 import Network.Wai.Handler.WebSockets
 import qualified Network.WebSockets as WS
 
+newtype PlayerId =
+  PlayerId SendPortId
+  deriving (Show, Eq, Ord, Binary, Generic)
+
 data EngineMsg msg
-  = Join SendPortId
-  | Leave SendPortId
-  | GameMsg SendPortId
+  = Join PlayerId
+  | Leave PlayerId
+  | GameTick
+  | GameMsg PlayerId
             msg
   deriving (Show, Eq, Binary, Generic)
 
-data PubSubMsg view
-  = Sub (SendPort view)
-  | Unsub (SendPort view)
+data PubSubMsg globalView playerView
+  = SubGlobal (SendPort globalView)
+  | SubPlayer (SendPort playerView)
+  | UnsubGlobal (SendPort globalView)
+  | UnsubPlayer (SendPort playerView)
   deriving (Show, Eq, Binary, Generic)
-
-timeBetweenPlayerCommands :: NominalDiffTime
-timeBetweenPlayerCommands = 0.1
 
 ------------------------------------------------------------
 -- Websocket Server & Wiring.
 ------------------------------------------------------------
-runGame
-  :: (Serializable msg
-     ,Serializable view
-     ,FromJSON msg
-     ,ToJSON view
-     ,Show view
-     ,Show state
-     ,Show msg)
-  => state -> (EngineMsg msg -> state -> state) -> (state -> view) -> IO ()
-runGame initialGameState update view =
+runGame ::
+     ( Serializable msg
+     , Serializable globalView
+     , Serializable playerView
+     , FromJSON msg
+     , ToJSON globalView
+     , ToJSON playerView
+     )
+  => state
+  -> (EngineMsg msg -> state -> state)
+  -> (state -> (globalView, Map PlayerId playerView))
+  -> IO ()
+runGame initialGameState update viewFn =
   let settings = Warp.setHost "*" . Warp.setPort 8000 $ Warp.defaultSettings
-  in runStdoutLoggingT $
-     do logInfoN "START"
-        logInfoN "Booting Cloud Haskell"
-        backend <- liftIO createTransport
-        node <- liftIO $ newLocalNode backend initRemoteTable
-        logInfoN $
-          sformat
-            ("Starting listener with settings: " % F.string % ":" % F.int)
-            (show $ Warp.getHost settings)
-            (Warp.getPort settings)
-        _ <-
-          liftIO . runProcess node $
-          do (txSubscription, rxSubscription) <- newChan
-             (txGameView, rxGameView) <- newChan
-             (txGameMsg, rxGameMsg) <- newChan
-             _ <- spawnLocal $ broadcaster rxGameView rxSubscription
-             _ <- spawnLocal $ gameProcess rxGameMsg txGameView update view initialGameState
-             liftIO . Warp.runSettings settings $
-               websocketsOr
-                 WS.defaultConnectionOptions
-                 (runResourceT . acceptClientConnection node txGameMsg txSubscription)
-                 (staticApp $ defaultFileServerSettings "../client/dist")
-        logInfoN "END"
+  in do putStrLn "Starting up..."
+        backend <- createTransport
+        node <- newLocalNode backend initRemoteTable
+        runProcess node $ do
+          (txSubscription, rxSubscription) <- newChan
+          (txGame, rxGame) <- newChan
+          (txGameMsg, rxGameMsg) <- newChan
+          _ <-
+            spawnLocal . void . periodically (milliSeconds 500) $
+            sendChan txGameMsg GameTick
+          _ <- spawnLocal $ broadcaster rxGame rxSubscription
+          _ <-
+            spawnLocal $
+            gameProcess rxGameMsg txGame update viewFn initialGameState
+          liftIO . Warp.runSettings settings $
+            websocketsOr
+              WS.defaultConnectionOptions
+              (acceptClientConnection node txGameMsg txSubscription)
+              (staticApp $ defaultFileServerSettings "../client/dist")
 
-acceptClientConnection
-  :: (MonadResource m
-     ,Serializable msg
-     ,Serializable view
-     ,FromJSON msg
-     ,ToJSON view
-     ,Show view
-     ,Show msg)
+acceptClientConnection ::
+     ( Serializable msg
+     , Serializable globalView
+     , Serializable playerView
+     , FromJSON msg
+     , ToJSON globalView
+     , ToJSON playerView
+     )
   => LocalNode
   -> SendPort (EngineMsg msg)
-  -> SendPort (PubSubMsg view)
+  -> SendPort (PubSubMsg globalView playerView)
   -> WS.PendingConnection
-  -> m ()
+  -> IO ()
 acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
-  (_releaseKey, connection) <-
-    allocate
-      (runStdoutLoggingT $
-       do logInfoN "P: New connection received."
-          liftIO $ WS.acceptRequest pendingConnection)
-      (\_ -> putStrLn "P: Leaves")
-  liftIO . runProcess node $
-    do (txToPlayer, rxFromBroadcaster) <- newChan
-       let disconnectHandler :: WS.ConnectionException -> Process ()
-           disconnectHandler ex = do
-             liftIO . putStrLn $
-               "P: Socket has closed. Unsubscribing: " <> show ex
-             sendChan txSubscribe (Unsub txToPlayer)
-             sendChan txGameMsg $ Leave (sendPortId txToPlayer)
-       _ <-
-         spawnLocal $ receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
-       sendChan txSubscribe (Sub txToPlayer)
-       sendChan txGameMsg $ Join (sendPortId txToPlayer)
-       announceToPlayer connection rxFromBroadcaster disconnectHandler
+  connection <- WS.acceptRequest pendingConnection
+  runProcess node $ do
+    (txToPlayer, rxFromBroadcaster) <- newChan
+    let disconnectHandler = do
+          sendChan txSubscribe (UnsubPlayer txToPlayer)
+          sendChan txGameMsg $ Leave (playerId txToPlayer)
+    _ <-
+      spawnLocal $
+      receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
+    sendChan txSubscribe (SubPlayer txToPlayer)
+    sendChan txGameMsg $ Join (playerId txToPlayer)
+    announceToPlayer connection rxFromBroadcaster disconnectHandler
 
 ------------------------------------------------------------
 -- Player
 ------------------------------------------------------------
--- TODO This process could do with some refactoring. The walking-cases are a bad sign.
-receiveFromPlayer
-  :: (Serializable msg, Serializable view, Show msg, Show view, FromJSON msg)
-  => SendPort view
+
+playerId :: SendPort a -> PlayerId
+playerId = PlayerId . sendPortId
+
+receiveFromPlayer ::
+     (Serializable msg, Serializable playerView, FromJSON msg)
+  => SendPort playerView
   -> SendPort (EngineMsg msg)
-  -> (WS.ConnectionException -> Process ())
+  -> Process ()
   -> WS.Connection
   -> Process ()
-receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection = do
-  liftIO $ putStrLn "P: LISTENING"
-  handle Nothing
+receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection = handle
   where
-    handle :: Maybe UTCTime -> Process ()
-    handle lastMessageHandled = do
+    handle = do
       raw <- liftIO . Ex.try $ WS.receiveDataMessage connection
       case raw of
-        Left ex -> disconnectHandler ex
-        Right (WS.Binary _) -> handle lastMessageHandled
-        Right (WS.Text text) -> do
-          liftIO . putStrLn $ "P: HEARD: " <> show text
-          case Aeson.eitherDecode text of
-            Left err -> do
-              liftIO . putStrLn $ "Couldn't understand: " <> show text
-              liftIO . putStrLn $ "  Error was: " <> show err
-              handle lastMessageHandled
-            Right msg -> do
-              now <- liftIO getCurrentTime
-              case lastMessageHandled of
-                Nothing -> do
-                  sendChan txGameMsg $ GameMsg (sendPortId txToPlayer) msg
-                  handle (Just now)
-                Just t ->
-                  if addUTCTime timeBetweenPlayerCommands t < now
-                    then do
-                      sendChan txGameMsg $ GameMsg (sendPortId txToPlayer) msg
-                      handle (Just now)
-                    else handle lastMessageHandled
+        Left (_ :: WS.ConnectionException) -> disconnectHandler
+        Right (WS.Binary _) -> handle
+        Right (WS.Text text) ->
+          case Aeson.decode text of
+            Nothing -> handle
+            Just msg -> do
+              sendChan txGameMsg $ GameMsg (playerId txToPlayer) msg
+              handle
 
-announceToPlayer
-  :: (Show view, Serializable view, ToJSON view)
+announceToPlayer ::
+     (Serializable playerView, ToJSON playerView)
   => WS.Connection
-  -> ReceivePort view
-  -> (WS.ConnectionException -> Process ())
+  -> ReceivePort playerView
+  -> Process ()
   -> Process ()
 announceToPlayer connection rx disconnectHandler = handle
   where
@@ -168,51 +150,56 @@ announceToPlayer connection rx disconnectHandler = handle
       msg <- receiveChan rx
       sent <- liftIO . Ex.try . WS.sendTextData connection $ Aeson.encode msg
       case sent of
-        Left ex -> disconnectHandler ex
+        Left (_ :: WS.ConnectionException) -> disconnectHandler
         Right _ -> handle
 
 ------------------------------------------------------------
 -- Broadcaster
 ------------------------------------------------------------
-broadcaster
-  :: (Show view, Serializable view)
-  => ReceivePort view -> ReceivePort (PubSubMsg view) -> Process ()
-broadcaster inboundGame subscriptionRequests = iterateM_ handle Set.empty
+broadcaster ::
+     (Serializable globalView, Serializable playerView)
+  => ReceivePort (globalView, Map PlayerId playerView)
+  -> ReceivePort (PubSubMsg globalView playerView)
+  -> Process ()
+broadcaster rxGame rxSubscription = iterateM_ handle (Set.empty, Set.empty)
   where
-    handle subscribers = do
-      liftIO . putStrLn $ "B: Subscribers: " <> show subscribers
+    handle (viewers, players) = do
       mergedPorts <-
-        mergePortsBiased [Left <$> subscriptionRequests, Right <$> inboundGame]
+        mergePortsBiased [Left <$> rxSubscription, Right <$> rxGame]
       msg <- receiveChan mergedPorts
       case msg of
-        Left (Sub subscriber) -> do
-          liftIO . putStrLn $ "B: adding: " <> show subscriber
-          return (Set.insert subscriber subscribers)
-        Left (Unsub subscriber) -> do
-          liftIO . putStrLn $ "B: removing: " <> show subscriber
-          return (Set.delete subscriber subscribers)
-        Right state -> do
-          liftIO . putStrLn $
-            "B: Broadcasting: " <> show state <> " to: " <> show subscribers
-          traverse_ (`sendChan` state) $ Set.toList subscribers
-          return subscribers
+        Left (SubGlobal viewer) -> return (Set.insert viewer viewers, players)
+        Left (SubPlayer player) -> return (viewers, Set.insert player players)
+        Left (UnsubGlobal viewer) -> return (Set.delete viewer viewers, players)
+        Left (UnsubPlayer player) -> return (viewers, Set.delete player players)
+        Right (globalView, playerViews) -> do
+          traverse_ (`sendChan` globalView) viewers
+          forM_ players $ \s ->
+            case Map.lookup (playerId s) playerViews of
+              Just view -> sendChan s view
+              Nothing -> return ()
+          return (viewers, players)
 
 ------------------------------------------------------------
 -- Game
 ------------------------------------------------------------
-gameProcess
-  :: (Serializable msg, Serializable view, Show msg, Show state)
+gameProcess ::
+     ( Serializable msg
+     , Serializable globalView
+     , Serializable playerView
+     )
   => ReceivePort (EngineMsg msg)
-  -> SendPort view
+  -> SendPort (globalView, Map PlayerId playerView)
   -> (EngineMsg msg -> state -> state)
-  -> (state -> view)
+  -> (state -> (globalView, Map PlayerId playerView))
   -> state
   -> Process ()
-gameProcess rxGameMsg txGameView updateFn viewFn = iterateM_ handle
+gameProcess rxGameMsg txGame updateFn viewFn = iterateM_ handle
   where
     handle game = do
       msg <- receiveChan rxGameMsg
-      liftIO . putStrLn $ "G: Heard: " <> show msg
-      let newGame = updateFn msg game
-      sendChan txGameView (viewFn newGame)
-      return newGame
+      let game' = updateFn msg game
+      case msg of
+        GameTick -> sendChan txGame (viewFn game')
+        _ -> return ()
+      return game'

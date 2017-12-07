@@ -16,8 +16,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Network.GameEngine
-                     , EchoGame
-                     , PresentDrop
+                     , ElfPrison
   build-depends:       base >= 4.7 && < 5
                      , MonadRandom
                      , aeson
@@ -27,6 +26,7 @@ library
                      , wai-app-static
                      , bytestring
                      , distributed-process
+                     , distributed-process-extras
                      , distributed-process-simplelocalnet
                      , distributed-process-supervisor
                      , network-transport-inmemory
