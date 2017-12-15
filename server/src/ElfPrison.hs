@@ -187,15 +187,41 @@ tickPlayer model playerId =
   updateLastRound model playerId >>> updateScore >>> resetPlays
 
 updateLastRound :: Model -> PlayerId -> Player -> Player
-updateLastRound model playerId player = player
+updateLastRound model playerId player =
+  let (x, y) = Lens.view position player
+      result =
+        MatchResult
+          (getResult (x, y - 1) north)
+          (getResult (x + 1, y) east)
+          (getResult (x, y + 1) south)
+          (getResult (x - 1, y) west)
+  in set lastRound (Just result) player
+  where
+    getResult pos d = do
+      opponentId <- Map.lookup pos (_playerPositions model)
+      opponent <- Map.lookup opponentId (_players model)
+      play <- Lens.view (plays . d) opponent
+      return (Lens.view name opponent, play)
 
 updateScore :: Player -> Player
-updateScore player = player
+updateScore player =
+  let result = _lastRound player
+  in case result of
+       Nothing -> player
+       Just result ->
+         let getScore d1 d2 =
+               scoreMatch (Lens.view (plays . d1) player) (snd <$> d2 result)
+             score' =
+               Lens.view score player + getScore north matchResultNorth +
+               getScore east matchResultEast +
+               getScore south matchResultSouth +
+               getScore west matchResultWest
+         in set score score' player
 
 resetPlays :: Player -> Player
 resetPlays = set plays emptyPlays
 
-scoreMatch :: Maybe Play -> Maybe Play -> Int
+scoreMatch :: Maybe Play -> Maybe Play -> Integer
 scoreMatch Nothing Nothing = 0
 scoreMatch Nothing (Just Betray) = 0
 scoreMatch Nothing (Just Cooperate) = 0
