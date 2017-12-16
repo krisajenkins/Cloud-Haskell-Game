@@ -1,32 +1,37 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Network.GameEngine where
 
-import Control.Distributed.Process
-import Formatting as F
-import Control.Distributed.Process.Node
-import Control.Distributed.Process.Serializable
-import qualified Control.Exception as Ex
-import Control.Monad.Logger
-import Control.Monad.Loops
-import Control.Monad.Trans.Resource
-import Data.Aeson (FromJSON, ToJSON)
-import qualified Data.Aeson as Aeson
-import Data.Binary
-import Data.Foldable
-import Data.Monoid
-import qualified Data.Set as Set
-import qualified Data.Text as T
-import Data.Time
-import GHC.Generics
-import Network.Transport.InMemory
-import Network.Wai.Application.Static
-import qualified Network.Wai.Handler.Warp as Warp
-import Network.Wai.Handler.WebSockets
-import qualified Network.WebSockets as WS
+import           Control.Distributed.Process
+import           Control.Distributed.Process.Node
+import           Control.Distributed.Process.Serializable
+import qualified Control.Exception                        as Ex
+import           Control.Monad
+import           Control.Monad.Logger
+import           Control.Monad.Loops
+import           Control.Monad.State                      (evalStateT)
+import qualified Control.Monad.State                      as State
+import           Control.Monad.Trans.Resource             (MonadResource,
+                                                           allocate,
+                                                           runResourceT)
+import           Data.Aeson                               (FromJSON, ToJSON)
+import qualified Data.Aeson                               as Aeson
+import           Data.Binary
+import           Data.Foldable
+import           Data.Monoid
+import qualified Data.Set                                 as Set
+import           Data.Time
+import           Formatting                               (sformat, (%))
+import qualified Formatting                               as F
+import           GHC.Generics
+import           Network.Transport.InMemory
+import           Network.Wai.Application.Static
+import qualified Network.Wai.Handler.Warp                 as Warp
+import           Network.Wai.Handler.WebSockets
+import qualified Network.WebSockets                       as WS
 
 data EngineMsg msg
   = Join SendPortId
@@ -160,6 +165,37 @@ receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection = do
                       handle (Just now)
                     else handle lastMessageHandled
 
+------------------------------------------------------------
+-- Rate Limiting
+------------------------------------------------------------
+class Monad m =>
+      MonadNow m where
+  currentTime :: m UTCTime
+
+instance MonadNow IO where
+  currentTime = getCurrentTime
+
+instance MonadNow Process where
+  currentTime = liftIO getCurrentTime
+
+rateLimit
+  :: MonadNow m
+  => NominalDiffTime -> m a -> m a
+rateLimit interval action =
+  forever $ do
+    now <- currentTime
+    evalStateT loop now
+  where
+    loop = do
+      now <- State.lift currentTime
+      lastActionTime <- State.get
+      if addUTCTime interval lastActionTime < now
+        then do
+          State.put now
+          State.lift action
+        else loop
+
+------------------------------------------------------------
 announceToPlayer
   :: (Show view, Serializable view, ToJSON view)
   => WS.Connection
