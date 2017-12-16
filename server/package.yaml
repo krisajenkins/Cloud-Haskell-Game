@@ -8,6 +8,8 @@ maintainer: krisajenkins@gmail.com
 copyright: 2016 Kris Jenkins
 license: AllRightsReserved
 github: krisajenkins/cloud-haskell-game
+ghc-options: -Wall
+
 extra-source-files:
 - README.md
 
@@ -54,7 +56,7 @@ executables:
     - cloud-haskell-game
 
 tests:
-  cloud-haskell-game-test:
+  spec:
     main: Spec.hs
     source-dirs: test
     dependencies:
