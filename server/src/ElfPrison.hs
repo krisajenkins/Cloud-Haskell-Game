@@ -241,7 +241,20 @@ globalView model =
   }
 
 playerView :: Model -> Player -> PlayerView
-playerView model playerId = PlayerView Nothing Nothing Nothing Nothing Nothing
+playerView model player =
+  let (x, y) = player ^. position
+  in PlayerView
+     { viewNorth = nameAt (x, y - 1)
+     , viewEast = nameAt (x + 1, y)
+     , viewSouth = nameAt (x, y + 1)
+     , viewWest = nameAt (x - 1, y)
+     , viewLastRound = player ^. lastRound
+     }
+  where
+    nameAt pos = do
+      opponentId <- model ^. playerPositions . at pos
+      opponent <- model ^. players . at opponentId
+      return $ opponent ^. name
 
 view :: Model -> (GlobalView, Map PlayerId PlayerView)
 view model = (globalView model, playerView model <$> _players model)
