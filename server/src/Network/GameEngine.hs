@@ -21,6 +21,7 @@ import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as Aeson
 import Data.Binary
 import Data.Foldable
+import Data.Function ((&))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -101,18 +102,33 @@ acceptClientConnection ::
   -> WS.PendingConnection
   -> IO ()
 acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
+  let path = WS.pendingRequest pendingConnection & WS.requestPath
   connection <- WS.acceptRequest pendingConnection
-  runProcess node $ do
-    (txToPlayer, rxFromBroadcaster) <- newChan
-    let disconnectHandler = do
-          sendChan txSubscribe (UnsubPlayer txToPlayer)
-          sendChan txGameMsg $ Leave (playerId txToPlayer)
-    _ <-
-      spawnLocal $
-      receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
-    sendChan txSubscribe (SubPlayer txToPlayer)
-    sendChan txGameMsg $ Join (playerId txToPlayer)
-    announceToPlayer connection rxFromBroadcaster disconnectHandler
+  if path == "global"
+    then acceptGlobal connection
+    else acceptPlayer connection
+  where
+    acceptGlobal connection =
+      runProcess node $ do
+        (txToGlobal, rxFromBroadcaster) <- newChan
+        let disconnectHandler = sendChan txSubscribe (UnsubGlobal txToGlobal)
+        _ <-
+          spawnLocal $
+          receiveFromPlayer txToGlobal txGameMsg disconnectHandler connection
+        sendChan txSubscribe (SubGlobal txToGlobal)
+        announceToPlayer connection rxFromBroadcaster disconnectHandler
+    acceptPlayer connection =
+      runProcess node $ do
+        (txToPlayer, rxFromBroadcaster) <- newChan
+        let disconnectHandler = do
+              sendChan txSubscribe (UnsubPlayer txToPlayer)
+              sendChan txGameMsg $ Leave (playerId txToPlayer)
+        _ <-
+          spawnLocal $
+          receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection
+        sendChan txSubscribe (SubPlayer txToPlayer)
+        sendChan txGameMsg $ Join (playerId txToPlayer)
+        announceToPlayer connection rxFromBroadcaster disconnectHandler
 
 ------------------------------------------------------------
 -- Player
@@ -143,9 +159,9 @@ receiveFromPlayer txToPlayer txGameMsg disconnectHandler connection = handle
               handle
 
 announceToPlayer ::
-     (Serializable playerView, ToJSON playerView)
+     (Serializable view, ToJSON view)
   => WS.Connection
-  -> ReceivePort playerView
+  -> ReceivePort view
   -> Process ()
   -> Process ()
 announceToPlayer connection rx disconnectHandler = handle
