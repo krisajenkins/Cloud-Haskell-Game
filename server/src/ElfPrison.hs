@@ -9,7 +9,7 @@ module ElfPrison where
 
 import Control.Arrow ((>>>))
 import Control.Distributed.Process
-import Control.Lens (at, ix, makeLenses, over, set, toListOf)
+import Control.Lens (at, ix, makeLenses, set, toListOf, (^.), (^?), (+~), (%~), _Just)
 import qualified Control.Lens as Lens
 import Data.Aeson
 import Data.Aeson.Casing
@@ -125,7 +125,7 @@ nextSpiral (x, y)
   | x > 0 && x > abs y = (x, y - 1)
   | y > 0 && y >= abs x = (x + 1, y)
   | x < 0 && -x <= abs y = (x, y + 1)
-  | y < 0 && -y >= abs x = (x - 1, y)
+  | otherwise = (x - 1, y)
 
 newPlayer :: Position -> Player
 newPlayer pos =
@@ -155,19 +155,18 @@ update (GameMsg playerId (MakeChoice play dir)) = makeChoice playerId play dir
 
 addPlayer :: PlayerId -> Model -> Model
 addPlayer playerId model =
-  let pos = _nextPosition model
+  let pos = model ^. nextPosition
   in model & set (players . at playerId) (Just (newPlayer pos)) &
      set (playerPositions . at pos) (Just playerId) &
      set nextPosition (nextSpiral pos)
 
 removePlayer :: PlayerId -> Model -> Model
 removePlayer playerId model =
-  let pos = _position <$> Lens.view (players . at playerId) model
-  in case pos of
-       Nothing -> model
-       Just pos ->
-         model & set (players . at playerId) Nothing &
-         set (playerPositions . at pos) Nothing
+  case model ^? players . at playerId . _Just . position of
+    Nothing -> model
+    Just pos ->
+      model & set (players . at playerId) Nothing &
+      set (playerPositions . at pos) Nothing
 
 makeChoice :: PlayerId -> Play -> Direction -> Model -> Model
 makeChoice playerId play dir =
@@ -180,15 +179,15 @@ makeChoice playerId play dir =
   in set (players . ix playerId . plays . d) (Just play)
 
 tick :: Model -> Model
-tick model = model {_players = Map.mapWithKey (tickPlayer model) $ _players model}
+tick model = model & players %~ fmap (tickPlayer model)
 
-tickPlayer :: Model -> PlayerId -> Player -> Player
-tickPlayer model playerId =
-  updateLastRound model playerId >>> updateScore >>> resetPlays
+tickPlayer :: Model -> Player -> Player
+tickPlayer model =
+  updateLastRound model >>> updateScore >>> resetPlays
 
-updateLastRound :: Model -> PlayerId -> Player -> Player
-updateLastRound model playerId player =
-  let (x, y) = Lens.view position player
+updateLastRound :: Model -> Player -> Player
+updateLastRound model player =
+  let (x, y) = player ^. position
       result =
         MatchResult
           (getResult (x, y - 1) north)
@@ -198,25 +197,22 @@ updateLastRound model playerId player =
   in set lastRound (Just result) player
   where
     getResult pos d = do
-      opponentId <- Map.lookup pos (_playerPositions model)
-      opponent <- Map.lookup opponentId (_players model)
-      play <- Lens.view (plays . d) opponent
-      return (Lens.view name opponent, play)
+      opponentId <- model ^. playerPositions . at pos
+      opponent <- model ^. players . at opponentId
+      play <- opponent ^. plays . d
+      return (opponent ^. name, play)
 
 updateScore :: Player -> Player
 updateScore player =
-  let result = _lastRound player
-  in case result of
-       Nothing -> player
-       Just result ->
-         let getScore d1 d2 =
-               scoreMatch (Lens.view (plays . d1) player) (snd <$> d2 result)
-             score' =
-               Lens.view score player + getScore north matchResultNorth +
-               getScore east matchResultEast +
-               getScore south matchResultSouth +
-               getScore west matchResultWest
-         in set score score' player
+  case player ^. lastRound of
+    Nothing -> player
+    Just result ->
+      let getScore d1 d2 = scoreMatch (player ^. plays . d1) (snd <$> d2 result)
+      in player & score +~ getScore north matchResultNorth +
+         getScore east matchResultEast +
+         getScore south matchResultSouth +
+         getScore west matchResultWest
+
 
 resetPlays :: Player -> Player
 resetPlays = set plays emptyPlays
