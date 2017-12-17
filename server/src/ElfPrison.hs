@@ -227,10 +227,10 @@ scoreMatch Nothing (Just Betray) = 0
 scoreMatch Nothing (Just Cooperate) = 0
 scoreMatch (Just Betray) Nothing = 0
 scoreMatch (Just Cooperate) Nothing = 0
-scoreMatch (Just Betray) (Just Betray) = 0
-scoreMatch (Just Betray) (Just Cooperate) = 0
-scoreMatch (Just Cooperate) (Just Betray) = 0
-scoreMatch (Just Cooperate) (Just Cooperate) = 0
+scoreMatch (Just Betray) (Just Betray) = 2
+scoreMatch (Just Betray) (Just Cooperate) = 4
+scoreMatch (Just Cooperate) (Just Betray) = 1
+scoreMatch (Just Cooperate) (Just Cooperate) = 3
 
 globalView :: Model -> GlobalView
 globalView model =
