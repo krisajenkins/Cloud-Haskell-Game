@@ -8,14 +8,11 @@
 module ElfPrison where
 
 import Control.Arrow ((>>>))
-import Control.Distributed.Process
 import Control.Lens (at, ix, makeLenses, set, toListOf, (^.), (^?), (+~), (%~), _Just)
-import qualified Control.Lens as Lens
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Binary
 import Data.Function ((&))
-import Data.List (find)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)

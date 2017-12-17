@@ -3,7 +3,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Network.GameEngine where
+module Network.GameEngine
+  ( runGame
+  , PlayerId
+  , EngineMsg(..)
+  ) where
 
 import Control.Distributed.Process
 import Control.Distributed.Process.Extras.Time
