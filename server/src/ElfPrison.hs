@@ -34,7 +34,7 @@ data Direction
 
 data Play
   = Betray
-  | Cooperate
+  | StayLoyal
   deriving (Show, Eq, Binary, Generic, FromJSON, ToJSON)
 
 data PlayerPlays = PlayerPlays
@@ -224,13 +224,13 @@ resetPlays = set plays emptyPlays
 scoreMatch :: Maybe Play -> Maybe Play -> Integer
 scoreMatch Nothing Nothing = 0
 scoreMatch Nothing (Just Betray) = 0
-scoreMatch Nothing (Just Cooperate) = 0
+scoreMatch Nothing (Just StayLoyal) = 0
 scoreMatch (Just Betray) Nothing = 0
-scoreMatch (Just Cooperate) Nothing = 0
+scoreMatch (Just StayLoyal) Nothing = 0
 scoreMatch (Just Betray) (Just Betray) = 2
-scoreMatch (Just Betray) (Just Cooperate) = 4
-scoreMatch (Just Cooperate) (Just Betray) = 1
-scoreMatch (Just Cooperate) (Just Cooperate) = 3
+scoreMatch (Just Betray) (Just StayLoyal) = 4
+scoreMatch (Just StayLoyal) (Just Betray) = 1
+scoreMatch (Just StayLoyal) (Just StayLoyal) = 3
 
 globalView :: Model -> GlobalView
 globalView model =
@@ -240,7 +240,7 @@ globalView model =
       [ SetName "Kris"
       , SetColor "#ff0000"
       , MakeChoice Betray North
-      , MakeChoice Cooperate West
+      , MakeChoice StayLoyal West
       ]
   }
 
