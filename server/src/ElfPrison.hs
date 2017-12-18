@@ -54,7 +54,7 @@ data MatchResult = MatchResult
   } deriving (Show, Eq, Binary, Generic)
 
 instance ToJSON MatchResult  where
-  toJSON = genericToJSON $ aesonPrefix camelCase
+  toJSON = genericToJSON $ aesonDrop 11 camelCase
 
 data Player = Player
   { _score :: Integer
@@ -81,7 +81,6 @@ makeLenses ''Model
 
 data GlobalView = GlobalView
   { viewPlayers :: [Player]
-  , viewSampleCommands :: [Msg]
   } deriving (Show, Eq, Binary, Generic)
 
 instance ToJSON GlobalView where
@@ -89,10 +88,12 @@ instance ToJSON GlobalView where
 
 data PlayerView = PlayerView
   { viewNorth :: Maybe Text
-  , viewSouth :: Maybe Text
   , viewEast :: Maybe Text
+  , viewSouth :: Maybe Text
   , viewWest :: Maybe Text
   , viewLastRound :: Maybe MatchResult
+  , viewScore :: Integer
+  , viewSampleCommands :: [Msg]
   } deriving (Show, Eq, Binary, Generic)
 
 instance ToJSON PlayerView where
@@ -187,10 +188,11 @@ updateLastRound model player =
   let (x, y) = player ^. position
       result =
         MatchResult
-          (getResult (x, y - 1) north)
-          (getResult (x + 1, y) east)
-          (getResult (x, y + 1) south)
-          (getResult (x - 1, y) west)
+        { matchResultNorth = getResult (x, y + 1) south
+        , matchResultEast = getResult (x + 1, y) west
+        , matchResultSouth = getResult (x, y - 1) north
+        , matchResultWest = getResult (x - 1, y) east
+        }
   in set lastRound (Just result) player
   where
     getResult pos d = do
@@ -205,11 +207,10 @@ updateScore player =
     Nothing -> player
     Just result ->
       let getScore d1 d2 = scoreMatch (player ^. plays . d1) (snd <$> d2 result)
-      in player & score +~ getScore north matchResultNorth +
-         getScore east matchResultEast +
-         getScore south matchResultSouth +
-         getScore west matchResultWest
-
+      in player & score +~
+         (getScore north matchResultNorth + getScore east matchResultEast +
+          getScore south matchResultSouth +
+          getScore west matchResultWest)
 
 resetPlays :: Player -> Player
 resetPlays = set plays emptyPlays
@@ -227,15 +228,7 @@ scoreMatch (Just StayLoyal) (Just StayLoyal) = 3
 
 globalView :: Model -> GlobalView
 globalView model =
-  GlobalView
-  { viewPlayers = toListOf (players . traverse) model
-  , viewSampleCommands =
-      [ SetName "Kris"
-      , SetColor "#ff0000"
-      , MakeChoice Betray North
-      , MakeChoice StayLoyal West
-      ]
-  }
+  GlobalView {viewPlayers = toListOf (players . traverse) model}
 
 playerView :: Model -> Player -> PlayerView
 playerView model player =
@@ -246,6 +239,13 @@ playerView model player =
      , viewSouth = nameAt (x, y + 1)
      , viewWest = nameAt (x - 1, y)
      , viewLastRound = player ^. lastRound
+     , viewScore = player ^. score
+     , viewSampleCommands =
+         [ SetName "Kris"
+         , SetColor "#ff0000"
+         , MakeChoice Betray North
+         , MakeChoice StayLoyal West
+         ]
      }
   where
     nameAt pos = do
