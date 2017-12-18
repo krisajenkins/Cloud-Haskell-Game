@@ -104,7 +104,7 @@ acceptClientConnection ::
 acceptClientConnection node txGameMsg txSubscribe pendingConnection = do
   let path = WS.pendingRequest pendingConnection & WS.requestPath
   connection <- WS.acceptRequest pendingConnection
-  if path == "global"
+  if path == "/global"
     then acceptGlobal connection
     else acceptPlayer connection
   where
