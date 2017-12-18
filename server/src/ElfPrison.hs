@@ -74,7 +74,6 @@ instance ToJSON Player where
 data Model = Model
   { _players :: Map PlayerId Player
   , _playerPositions :: Map Position PlayerId
-  , _nextPosition :: Position
   , _names :: [Text]
   , _colors :: [Text]
   , _rng :: StdGen
@@ -118,7 +117,6 @@ initialModel stdGen =
   in Model
      { _players = Map.empty
      , _playerPositions = Map.empty
-     , _nextPosition = (0, 0)
      , _names = generateNames nameSeed
      , _colors = generateColors colorSeed
      , _rng = stdGen''
@@ -158,12 +156,14 @@ update (GameMsg playerId (MakeChoice play dir)) = makeChoice playerId play dir
 
 addPlayer :: PlayerId -> Model -> Model
 addPlayer playerId model =
-  let pos = model ^. nextPosition
+  let pos =
+        iterate nextSpiral (0, 0) &
+        filter (\p -> Map.notMember p (model ^. playerPositions)) &
+        head
       name:names' = model ^. names
       color:colors' = model ^. colors
   in model & set (players . at playerId) (Just (newPlayer name color pos)) &
      set (playerPositions . at pos) (Just playerId) &
-     set nextPosition (nextSpiral pos) &
      set names names' &
      set colors colors'
 
