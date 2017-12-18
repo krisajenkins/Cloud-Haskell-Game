@@ -26,11 +26,11 @@ playerView player =
     let
         weightedInset =
             inset
-                * (if player.score < 5 then
+                * (if player.score < 500 then
                     3.5
-                   else if player.score < 10 then
+                   else if player.score < 1000 then
                     2.5
-                   else if player.score < 20 then
+                   else if player.score < 2000 then
                     1.5
                    else
                     1
