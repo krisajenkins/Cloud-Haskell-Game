@@ -284,9 +284,9 @@ playerView model player =
   let (x, y) = player ^. position
   in PlayerView
      { viewName = player ^. name
-     , viewNorth = nameAt (x, y - 1)
+     , viewNorth = nameAt (x, y + 1)
      , viewEast = nameAt (x + 1, y)
-     , viewSouth = nameAt (x, y + 1)
+     , viewSouth = nameAt (x, y - 1)
      , viewWest = nameAt (x - 1, y)
      , viewLastRound = player ^. lastRound
      , viewScore = player ^. score
