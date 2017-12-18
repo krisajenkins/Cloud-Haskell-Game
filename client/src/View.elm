@@ -4,7 +4,6 @@ import CDN exposing (bootstrap)
 import Exts.Html exposing (nbsp)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (..)
 import RemoteData exposing (..)
 import Types exposing (..)
 import View.Scene
@@ -44,7 +43,9 @@ remoteDataView view remoteData =
 heading : Html Msg
 heading =
     div [ style [ ( "text-align", "center" ) ] ]
-        [ h1 [] [ text "Elf's Dilemma!" ] ]
+        [ h1 [] [ text "Elf's Dilemma!" ]
+        , h3 [] [ code [] [ text "ws://Game.ClearerCode.Com:8000" ] ]
+        ]
 
 
 boardView : Board -> Html Msg
@@ -52,7 +53,7 @@ boardView board =
     div [ style [ ( "display", "flex" ) ] ]
         [ div
             [ style
-                [ ( "width", "70vw" )
+                [ ( "width", "75vw" )
                 , ( "padding", "15px" )
                 ]
             ]
@@ -71,7 +72,7 @@ playerList : List Player -> Html msg
 playerList players =
     ul [ class "list-group" ]
         (players
-            |> List.sortBy (.score >> ((*) -1))
+            |> List.sortBy (.score >> (*) -1)
             |> List.map playerView
         )
 
@@ -89,7 +90,7 @@ playerView player =
             [ style
                 [ ( "display", "inline-block" )
                 , ( "border", "solid 1px black" )
-                , ( "background-color", (Maybe.withDefault "white" player.color) )
+                , ( "background-color", Maybe.withDefault "white" player.color )
                 , ( "transition", "all 1s" )
                 , ( "height", "15px" )
                 , ( "width", "15px" )
