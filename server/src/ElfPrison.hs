@@ -190,7 +190,7 @@ tick model = model & players %~ fmap (tickPlayer model)
 
 tickPlayer :: Model -> Player -> Player
 tickPlayer model =
-  updateLastRound model >>> updateScore >>> resetPlays
+  updateLastRound model >>> updateScore
 
 updateLastRound :: Model -> Player -> Player
 updateLastRound model player =
