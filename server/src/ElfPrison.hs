@@ -17,6 +17,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import GHC.Generics
+import Generators
 import Network.GameEngine
 import System.Random
 
@@ -74,6 +75,8 @@ data Model = Model
   { _players :: Map PlayerId Player
   , _playerPositions :: Map Position PlayerId
   , _nextPosition :: Position
+  , _names :: [Text]
+  , _colors :: [Text]
   , _rng :: StdGen
   } deriving (Show)
 
@@ -87,7 +90,8 @@ instance ToJSON GlobalView where
   toJSON = genericToJSON $ aesonDrop 4 camelCase
 
 data PlayerView = PlayerView
-  { viewNorth :: Maybe Text
+  { viewName :: Text
+  , viewNorth :: Maybe Text
   , viewEast :: Maybe Text
   , viewSouth :: Maybe Text
   , viewWest :: Maybe Text
@@ -100,8 +104,7 @@ instance ToJSON PlayerView where
   toJSON = genericToJSON $ aesonDrop 4 camelCase
 
 data Msg
-  = SetName Text
-  | SetColor Text
+  = SetColor Text
   | MakeChoice Play
                Direction
   deriving (Show, Eq, Binary, Generic, FromJSON, ToJSON)
@@ -110,12 +113,16 @@ data Msg
 
 initialModel :: StdGen -> Model
 initialModel stdGen =
-  Model
-  { _players = Map.empty
-  , _playerPositions = Map.empty
-  , _nextPosition = (0, 0)
-  , _rng = stdGen
-  }
+  let (nameSeed, stdGen') = next stdGen
+      (colorSeed, stdGen'') = next stdGen'
+  in Model
+     { _players = Map.empty
+     , _playerPositions = Map.empty
+     , _nextPosition = (0, 0)
+     , _names = generateNames nameSeed
+     , _colors = generateColors colorSeed
+     , _rng = stdGen''
+     }
 
 nextSpiral :: Position -> Position
 nextSpiral (0, 0) = (1, 0)
@@ -125,12 +132,12 @@ nextSpiral (x, y)
   | x < 0 && -x <= abs y = (x, y + 1)
   | otherwise = (x - 1, y)
 
-newPlayer :: Position -> Player
-newPlayer pos =
+newPlayer :: Text -> Text -> Position -> Player
+newPlayer name color pos =
   Player
-  { _name = "<Your Name Here>"
+  { _name = name
   , _score = 0
-  , _color = "white"
+  , _color = color
   , _position = pos
   , _plays = emptyPlays
   , _lastRound = Nothing
@@ -145,8 +152,6 @@ update :: EngineMsg Msg -> Model -> Model
 update (Join playerId) = addPlayer playerId
 update (Leave playerId) = removePlayer playerId
 update GameTick = tick
-update (GameMsg playerId (SetName newName)) =
-  set (players . ix playerId . name) newName
 update (GameMsg playerId (SetColor text)) =
   set (players . ix playerId . color) text
 update (GameMsg playerId (MakeChoice play dir)) = makeChoice playerId play dir
@@ -154,9 +159,13 @@ update (GameMsg playerId (MakeChoice play dir)) = makeChoice playerId play dir
 addPlayer :: PlayerId -> Model -> Model
 addPlayer playerId model =
   let pos = model ^. nextPosition
-  in model & set (players . at playerId) (Just (newPlayer pos)) &
+      name:names' = model ^. names
+      color:colors' = model ^. colors
+  in model & set (players . at playerId) (Just (newPlayer name color pos)) &
      set (playerPositions . at pos) (Just playerId) &
-     set nextPosition (nextSpiral pos)
+     set nextPosition (nextSpiral pos) &
+     set names names' &
+     set colors colors'
 
 removePlayer :: PlayerId -> Model -> Model
 removePlayer playerId model =
@@ -234,15 +243,15 @@ playerView :: Model -> Player -> PlayerView
 playerView model player =
   let (x, y) = player ^. position
   in PlayerView
-     { viewNorth = nameAt (x, y - 1)
+     { viewName = player ^. name
+     , viewNorth = nameAt (x, y - 1)
      , viewEast = nameAt (x + 1, y)
      , viewSouth = nameAt (x, y + 1)
      , viewWest = nameAt (x - 1, y)
      , viewLastRound = player ^. lastRound
      , viewScore = player ^. score
      , viewSampleCommands =
-         [ SetName "Kris"
-         , SetColor "#ff0000"
+         [ SetColor "#ff0000"
          , MakeChoice Betray North
          , MakeChoice StayLoyal West
          ]

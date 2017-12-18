@@ -17,10 +17,12 @@ library
   hs-source-dirs:      src
   exposed-modules:     Network.GameEngine
                      , ElfPrison
+  other-modules:       Generators
   build-depends:       base >= 4.7 && < 5
                      , MonadRandom
                      , aeson
                      , aeson-casing
+                     , array
                      , binary
                      , time
                      , wai-app-static
