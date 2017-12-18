@@ -20,6 +20,7 @@ import GHC.Generics
 import Generators
 import Network.GameEngine
 import System.Random
+import System.Random.Shuffle (shuffle')
 
 type Position = (Int, Int)
 
@@ -76,6 +77,7 @@ data Model = Model
   , _playerPositions :: Map Position PlayerId
   , _names :: [Text]
   , _colors :: [Text]
+  , _roundNum :: Int
   , _rng :: StdGen
   } deriving (Show)
 
@@ -119,6 +121,7 @@ initialModel stdGen =
      , _playerPositions = Map.empty
      , _names = generateNames nameSeed
      , _colors = generateColors colorSeed
+     , _roundNum = 0
      , _rng = stdGen''
      }
 
@@ -226,7 +229,7 @@ makeChoice playerId play dir =
   in set (players . ix playerId . plays . d) (Just play)
 
 tick :: Model -> Model
-tick model = model & players %~ fmap (tickPlayer model)
+tick model = model & players %~ fmap (tickPlayer model) & updateRoundNum & reshuffleBoard
 
 tickPlayer :: Model -> Player -> Player
 tickPlayer model =
@@ -263,6 +266,28 @@ updateScore player =
 
 resetPlays :: Player -> Player
 resetPlays = set plays emptyPlays
+
+updateRoundNum :: Model -> Model
+updateRoundNum = roundNum +~ 1
+
+reshuffleBoard :: Model -> Model
+reshuffleBoard model
+  | model ^. roundNum `mod` 20 /= 0 = model
+  | otherwise =
+    let numPlayers = model ^. players & Map.size
+        (stdGen', shuffleGen) = model ^. rng & split
+        players' =
+          model ^. players & Map.toList &
+          zipWith
+            (\pos (playerId, player) -> (playerId, set position pos player))
+            spiral' &
+          (\xs -> shuffle' xs numPlayers shuffleGen)
+        playerPositions' =
+          players' &
+          fmap (\(playerId, player) -> (player ^. position, playerId)) &
+          Map.fromList
+    in model & set rng stdGen' & set players (Map.fromList players') &
+       set playerPositions playerPositions'
 
 scoreMatch :: Maybe Play -> Maybe Play -> Integer
 scoreMatch Nothing Nothing = 0

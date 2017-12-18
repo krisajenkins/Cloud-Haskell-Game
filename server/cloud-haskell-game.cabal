@@ -40,6 +40,7 @@ library
                      , monad-loops
                      , mtl
                      , random
+                     , random-shuffle
                      , resourcet
                      , stm
                      , text
