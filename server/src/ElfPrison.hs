@@ -123,12 +123,52 @@ initialModel stdGen =
      }
 
 nextSpiral :: Position -> Position
-nextSpiral (0, 0) = (1, 0)
+nextSpiral (0, 0) = (1, 0) -- r
 nextSpiral (x, y)
-  | x > 0 && x > abs y = (x, y - 1)
-  | y > 0 && y >= abs x = (x + 1, y)
-  | x < 0 && -x <= abs y = (x, y + 1)
-  | otherwise = (x - 1, y)
+  | x > 0 && x > abs y = (x, y - 1) -- d
+  | y > 0 && y >= abs x = (x + 1, y) -- r
+  | x < 0 && x < abs y = (x, y + 1) -- u
+  | otherwise = (x - 1, y) -- l
+  -- | y < 0 && -y >= abs x = (x - 1, y)
+
+spiral' :: [Position]
+spiral' = fmap layer [0 ..] & concat
+  where
+    layer n = do
+      x <- [-n .. n]
+      y <- [-n .. n]
+      return (x, y)
+
+spiral :: [Position]
+spiral =
+  [ (0, 0) -- r
+  , (1, 0) -- d
+  , (1, -1) -- l
+  , (0, -1) -- l
+  , (-1, -1) -- u
+  , (-1, 0) -- u
+  , (-1, 1) -- r
+  , (0, 1) -- r
+  , (1, 1) -- r
+  , (2, 1) -- d
+  , (2, 0) -- d
+  , (2, -1) -- d
+  , (2, -2) -- l
+  , (1, -2) -- l
+  , (0, -2) -- l
+  , (-1, -2) -- l
+  , (-2, -2) -- u
+  , (-2, -1) -- u
+  , (-2, 0) -- u
+  , (-2, 1) -- u
+  , (-2, 2) -- r
+  , (-1, 2) -- r
+  , (0, 2) -- r
+  , (1, 2) -- r
+  , (2, 2) -- r
+  , (3, 2) -- d
+  , (3, 1) -- d
+  ]
 
 newPlayer :: Text -> Text -> Position -> Player
 newPlayer name color pos =
@@ -157,7 +197,7 @@ update (GameMsg playerId (MakeChoice play dir)) = makeChoice playerId play dir
 addPlayer :: PlayerId -> Model -> Model
 addPlayer playerId model =
   let pos =
-        iterate nextSpiral (0, 0) &
+        spiral' &
         filter (\p -> Map.notMember p (model ^. playerPositions)) &
         head
       name:names' = model ^. names
