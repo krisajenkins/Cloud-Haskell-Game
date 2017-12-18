@@ -240,9 +240,9 @@ updateLastRound model player =
   let (x, y) = player ^. position
       result =
         MatchResult
-        { matchResultNorth = getResult (x, y + 1) south
+        { matchResultNorth = getResult (x, y - 1) south
         , matchResultEast = getResult (x + 1, y) west
-        , matchResultSouth = getResult (x, y - 1) north
+        , matchResultSouth = getResult (x, y + 1) north
         , matchResultWest = getResult (x - 1, y) east
         }
   in set lastRound (Just result) player
@@ -309,9 +309,9 @@ playerView model player =
   let (x, y) = player ^. position
   in PlayerView
      { viewName = player ^. name
-     , viewNorth = nameAt (x, y + 1)
+     , viewNorth = nameAt (x, y - 1)
      , viewEast = nameAt (x + 1, y)
-     , viewSouth = nameAt (x, y - 1)
+     , viewSouth = nameAt (x, y + 1)
      , viewWest = nameAt (x - 1, y)
      , viewLastRound = player ^. lastRound
      , viewScore = player ^. score
