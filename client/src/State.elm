@@ -3,7 +3,6 @@ module State exposing (init, update, subscriptions)
 import Json.Decode as D exposing (Decoder)
 import Json.Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (decode, required)
-import Json.Encode as E
 import RemoteData exposing (RemoteData(..))
 import Response exposing (..)
 import Types exposing (..)
@@ -12,7 +11,7 @@ import WebSocket
 
 websocketEndpoint : String
 websocketEndpoint =
-    "ws://localhost:8000"
+    "ws://localhost:8000/global"
 
 
 init : Response Model Msg
@@ -31,73 +30,77 @@ update msg model =
             , Cmd.none
             )
 
-        GameMsg submsg ->
-            ( model
-            , encodeGameMsg submsg
-                |> E.encode 0
-                |> WebSocket.send websocketEndpoint
-            )
-
-
-encodeGameMsg : GameMsg -> E.Value
-encodeGameMsg msg =
-    E.object
-        <| case msg of
-            SetName string ->
-                [ ( "tag", E.string "SetName" )
-                , ( "contents", E.string string )
-                ]
-
-            SetColor string ->
-                [ ( "tag", E.string "SetColor" )
-                , ( "contents", E.string string )
-                ]
-
-            Move to ->
-                [ ( "tag", E.string "Move" )
-                , ( "contents"
-                  , E.object
-                        [ ( "x", E.float to.x )
-                        , ( "y", E.float to.y )
-                        ]
-                  )
-                ]
-
 
 decodeCoords : Decoder Coords
 decodeCoords =
-    decode Coords
-        |> required "x" D.float
-        |> required "y" D.float
+    D.map2 Coords (D.index 0 D.float) (D.index 1 D.float)
 
 
-decodeGps : Decoder Gps
-decodeGps =
-    decode Gps
-        |> required "distance" D.float
-        |> required "position" decodeCoords
+decodePlay : Decoder Play
+decodePlay =
+    D.string
+        |> D.andThen
+            (\s ->
+                case s of
+                    "Betray" ->
+                        D.succeed Betray
+
+                    "StayLoyal" ->
+                        D.succeed StayLoyal
+
+                    _ ->
+                        D.fail "Invalid play value"
+            )
+
+
+decodePlayerPlays : Decoder PlayerPlays
+decodePlayerPlays =
+    decode PlayerPlays
+        |> required "north" (D.maybe decodePlay)
+        |> required "east" (D.maybe decodePlay)
+        |> required "south" (D.maybe decodePlay)
+        |> required "west" (D.maybe decodePlay)
+
+
+decodeResult : Decoder ( String, Play )
+decodeResult =
+    D.map2 (,) (D.index 0 D.string) (D.index 1 decodePlay)
+
+
+decodeMatchResult : Decoder MatchResult
+decodeMatchResult =
+    decode MatchResult
+        |> required "north" (D.maybe decodeResult)
+        |> required "east" (D.maybe decodeResult)
+        |> required "south" (D.maybe decodeResult)
+        |> required "west" (D.maybe decodeResult)
 
 
 decodePlayer : Decoder Player
 decodePlayer =
     decode Player
-        |> required "name" D.string
         |> required "score" D.int
-        |> required "position" decodeCoords
+        |> required "name" D.string
         |> required "color" (D.maybe D.string)
+        |> required "position" decodeCoords
+        |> required "plays" decodePlayerPlays
+        |> required "lastRound" (D.maybe decodeMatchResult)
 
 
 decodeBoard : Decoder Board
 decodeBoard =
     decode Board
-        |> required "gpss" (D.list decodeGps)
         |> required "players" (D.list decodePlayer)
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ WebSocket.listen websocketEndpoint (D.decodeString decodeBoard >> RemoteData.fromResult >> Receive)
+        [ WebSocket.listen websocketEndpoint
+            (D.decodeString decodeBoard
+                >> RemoteData.fromResult
+                >> Receive
+            )
         , WebSocket.keepAlive websocketEndpoint
             |> Sub.map (always KeepAlive)
         ]

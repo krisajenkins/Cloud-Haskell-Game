@@ -44,9 +44,7 @@ remoteDataView view remoteData =
 heading : Html Msg
 heading =
     div [ style [ ( "text-align", "center" ) ] ]
-        [ h1 [] [ text "Triangulation!" ]
-        , Html.map GameMsg controls
-        ]
+        [ h1 [] [ text "Elf's Dilemma!" ] ]
 
 
 boardView : Board -> Html Msg
@@ -104,29 +102,3 @@ playerView player =
         , div [ class "badge" ]
             [ text <| toString player.score ]
         ]
-
-
-controls : Html GameMsg
-controls =
-    let
-        simpleButton label msg =
-            button
-                [ type_ "button"
-                , class "btn btn-default btn-sm"
-                , onClick msg
-                ]
-                [ text label ]
-    in
-        div
-            [ class "btn-group"
-            , style [ ( "margin", "0 auto" ) ]
-            ]
-            (List.map (uncurry simpleButton)
-                [ ( "Set Name", SetName "Kris" )
-                , ( "Set Color", SetColor "#0000ff" )
-                , ( "Left", Move <| Coords -1.0 0 )
-                , ( "Up", Move <| Coords 0.0 -1.0 )
-                , ( "Down", Move <| Coords 0.0 1.0 )
-                , ( "Right", Move <| Coords 1.0 0 )
-                ]
-            )

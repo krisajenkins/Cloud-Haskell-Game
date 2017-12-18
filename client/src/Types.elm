@@ -9,35 +9,44 @@ type alias Coords =
     }
 
 
-type alias Gps =
-    { distance : Float
+type alias Player =
+    { score : Int
+    , name : String
+    , color : Maybe String
     , position : Coords
+    , plays : PlayerPlays
+    , lastRound : Maybe MatchResult
     }
 
 
-type alias Player =
-    { name : String
-    , score : Int
-    , position : Coords
-    , color : Maybe String
+type Play
+    = Betray
+    | StayLoyal
+
+
+type alias PlayerPlays =
+    { north : Maybe Play
+    , east : Maybe Play
+    , south : Maybe Play
+    , west : Maybe Play
+    }
+
+
+type alias MatchResult =
+    { north : Maybe ( String, Play )
+    , east : Maybe ( String, Play )
+    , south : Maybe ( String, Play )
+    , west : Maybe ( String, Play )
     }
 
 
 type alias Board =
-    { gpss : List Gps
-    , players : List Player
+    { players : List Player
     }
 
 
-type GameMsg
-    = SetName String
-    | SetColor String
-    | Move Coords
-
-
 type Msg
-    = GameMsg GameMsg
-    | Receive (RemoteData String Board)
+    = Receive (RemoteData String Board)
     | KeepAlive
 
 
