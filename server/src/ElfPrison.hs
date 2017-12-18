@@ -85,6 +85,7 @@ makeLenses ''Model
 
 data GlobalView = GlobalView
   { viewPlayers :: [Player]
+  , viewRoundNum :: Int
   } deriving (Show, Eq, Binary, Generic)
 
 instance ToJSON GlobalView where
@@ -200,8 +201,7 @@ update (GameMsg playerId (MakeChoice play dir)) = makeChoice playerId play dir
 addPlayer :: PlayerId -> Model -> Model
 addPlayer playerId model =
   let pos =
-        spiral' &
-        filter (\p -> Map.notMember p (model ^. playerPositions)) &
+        spiral' & filter (\p -> Map.notMember p (model ^. playerPositions)) &
         head
       name:names' = model ^. names
       color:colors' = model ^. colors
@@ -273,15 +273,15 @@ updateRoundNum = roundNum +~ 1
 reshuffleBoard :: Model -> Model
 reshuffleBoard model
   | model ^. roundNum `mod` 20 /= 0 = model
+  | (model ^. players & Map.size) == 0 = model
   | otherwise =
-    let numPlayers = model ^. players & Map.size
-        (stdGen', shuffleGen) = model ^. rng & split
+    let (stdGen', shuffleGen) = model ^. rng & split
         players' =
           model ^. players & Map.toList &
+          (\xs -> shuffle' xs (length xs) shuffleGen) &
           zipWith
             (\pos (playerId, player) -> (playerId, set position pos player))
-            spiral' &
-          (\xs -> shuffle' xs numPlayers shuffleGen)
+            spiral'
         playerPositions' =
           players' &
           fmap (\(playerId, player) -> (player ^. position, playerId)) &
@@ -302,7 +302,10 @@ scoreMatch (Just StayLoyal) (Just StayLoyal) = 3
 
 globalView :: Model -> GlobalView
 globalView model =
-  GlobalView {viewPlayers = toListOf (players . traverse) model}
+  GlobalView
+  { viewPlayers = toListOf (players . traverse) model
+  , viewRoundNum = model ^. roundNum
+  }
 
 playerView :: Model -> Player -> PlayerView
 playerView model player =
